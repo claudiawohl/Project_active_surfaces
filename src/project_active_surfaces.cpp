@@ -18,8 +18,9 @@ using namespace Dune::Functions::BasisFactory;
 
 using Grid = Dune::AlbertaGrid<GRIDDIM, WORLDDIM>;
 //using Param = LagrangeBasis<Grid, 1, 1, 2, 2, 2, 1>;
+//using Grid = Dune::YaspGrid<WORLDDIM>;
 
-//Dune::YaspGrid<2> Grid();
+
 //auto Grid = Dune::AlbertaGrid<GRIDDIM, WORLDDIM>;
 //auto Grid = Dune::ALUGrid<GRIDDIM, WORLDDIM, Dune::simplex, Dune::nonconforming>();
 //auto Grid = Dune::FoamGrid<GRIDDIM, WORLDDIM>();
@@ -33,6 +34,7 @@ int main(int argc, char** argv)
     Environment env(argc, argv);
 
     auto grid = MeshCreator<Grid>("chMesh").create();
+    //Dune::YaspGrid<2> grid{ {1.,2.}, {8,8}};
 
     auto stokesBasis = composite(power<WORLDDIM>(lagrange<2>()), lagrange<1>());
     auto chBasis = power<2>(lagrange<1>());
@@ -57,10 +59,7 @@ int main(int argc, char** argv)
     auto _v =makeTreePath(_1,_0);
     auto _p =makeTreePath(_1,1);
 
-    auto grav_force = [](auto const& x)
-    {
-        return FieldVector<double,  WORLDDIM>{0.0, 0.98};
-    };
+
     auto opFconv = makeOperator(tag::test_trialvec{}, gradPhi);
 
     prob.addMatrixOperator(zot(invTau), _phi, _phi);
@@ -93,20 +92,23 @@ int main(int argc, char** argv)
     double density_inner = 100.0;
     double density_outer =1000.0;
 
+
 // <1/tau * u, v>
     auto opTime = makeOperator(tag::testvec_trialvec{},
-                               (phi*density_inner + (1-phi)*density_outer) * invTau);
+                               ((phi*density_inner + (1-phi)*density_outer)) * invTau);
     prob.addMatrixOperator(opTime, _v, _v);
 
 // <1/tau * u^old, v>
     auto opTimeOld = makeOperator(tag::testvec{},
-                                  (phi*density_inner + (1-phi)*density_outer)* invTau * probInstat.oldSolution(_v));
+                                  (phi*density_inner + (1-phi)*density_outer)* (invTau * probInstat.oldSolution(_v)
+                                  +FieldVector<double,  WORLDDIM>{0.0,0.098}));
     prob.addVectorOperator(opTimeOld, _v);
+    prob.addVectorOperator()
 
     for (int i = 0; i < Grid::dimensionworld; ++i) {
         // <(u^old * nabla)u_i, v_i>
         auto opNonlin = makeOperator(tag::test_gradtrial{},
-                                     (phi*density_inner + (1-phi)*density_outer) * prob.solution(_v));
+                                     ((phi*density_inner + (1-phi)*density_outer)) * prob.solution(_v));
         prob.addMatrixOperator(opNonlin, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
     }
 
@@ -135,9 +137,6 @@ int main(int argc, char** argv)
         prob.addMatrixOperator(zot(-sigma*partPhiOld), makeTreePath(_1,_0, i), _mu);
     }
 
-/*    auto opForce = makeOperator(tag::testvec{}, grav_force, 0);
-    prob.addVectorOperator(opForce, _v);*/
-
     int ref_int  = Parameters::get<int>("refinement->interface").value_or(10);
     int ref_bulk = Parameters::get<int>("refinement->bulk").value_or(2);
     GridFunctionMarker marker("interface", prob.grid(),
@@ -151,8 +150,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < 6; ++i) {
         phi << [eps,radius1,radius2](auto const& x) {
             using Math::sqr;
-            return 0.5*(1 - std::tanh((radius1+radius2)*(std::sqrt(sqr((x[0])/radius1) + sqr((x[1])/radius2)) - 1.0)/(4*std::sqrt(2.0)*eps)))
-                   +0.5*(1 - std::tanh((0.1+0.3)       *(std::sqrt(sqr((x[0]+0.6)/0.1) + sqr((x[1]-0.5)/0.3)) - 1.0)/(4*std::sqrt(2.0)*eps)));
+            return 0.5*(1 - std::tanh((radius1+radius2)*(std::sqrt(sqr((x[0]-0.)/radius1) + sqr((x[1]-0.)/radius2)) - 1.0)/(4*std::sqrt(2.0)*eps)));
         };
         prob.markElements(adaptInfo);
         prob.adaptGrid(adaptInfo);
