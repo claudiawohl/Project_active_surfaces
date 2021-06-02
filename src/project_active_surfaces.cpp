@@ -66,12 +66,12 @@ int main(int argc, char** argv)
     prob.addMatrixOperator(opFconv, _phi, _v);
     prob.addVectorOperator(zot(phiOld * invTau), _phi);
 
-    double M = Parameters::get<double>("parameters->mobility").value_or(1.0);
+    double M = Parameters::get<double>("parameters->mobility").value_or(0.4);
     prob.addMatrixOperator(sot(M), _phi, _mu);
     prob.addMatrixOperator(zot(1.0), _mu, _mu);
 
     double a = Parameters::get<double>("parameters->a").value_or(1.0);
-    double b = Parameters::get<double>("parameters->b").value_or(1.0/4.0);
+    double b = Parameters::get<double>("parameters->b").value_or(1.0);
 
     double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
     prob.addMatrixOperator(sot(-a*eps), _mu, _phi);
@@ -101,9 +101,8 @@ int main(int argc, char** argv)
 // <1/tau * u^old, v>
     auto opTimeOld = makeOperator(tag::testvec{},
                                   (phi*density_inner + (1-phi)*density_outer)* (invTau * probInstat.oldSolution(_v)
-                                  +FieldVector<double,  WORLDDIM>{0.0,0.098}));
+                                  +FieldVector<double,  WORLDDIM>{0.0,0.98}));
     prob.addVectorOperator(opTimeOld, _v);
-    prob.addVectorOperator()
 
     for (int i = 0; i < Grid::dimensionworld; ++i) {
         // <(u^old * nabla)u_i, v_i>
@@ -131,7 +130,7 @@ int main(int argc, char** argv)
     auto opP = makeOperator(tag::divtestvec_trial{}, 1.0);
     prob.addMatrixOperator(opP, makeTreePath(_1,_0), makeTreePath(_1,_1));
 
-    double sigma = 24.5;
+    double sigma = 24.5*3/(2* sqrt(2));
     for (int i=0; i<WORLDDIM; i++){
         auto partPhiOld = partialDerivativeOf(phi,i);
         prob.addMatrixOperator(zot(-sigma*partPhiOld), makeTreePath(_1,_0, i), _mu);
@@ -155,6 +154,10 @@ int main(int argc, char** argv)
         prob.markElements(adaptInfo);
         prob.adaptGrid(adaptInfo);
     }
+
+    //boundary condition
+    prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>1-1.e-8);}, _v, _v, 0.);
+    prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
 
     AdaptInstationary adapt("adapt", prob, adaptInfo, probInstat, adaptInfo);
     adapt.adapt();
