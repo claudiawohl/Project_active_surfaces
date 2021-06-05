@@ -1,12 +1,18 @@
 dimension of world:   2
 
-chMesh->macro file name:    ./macro/macro.square.2d
+chMesh->macro file name:    ./macro/benchmark.2d
 chMesh->global refinements: 8
 
-parameters->radius:  0.5
+parameters->radius:  0.3
 parameters->radius1: 0.3
 parameters->radius2: 0.5
-parameters->epsilon: 0.01
+parameters->epsilon: 0.04
+parameters->centerx: 0.5
+parameters->centery: 0.5
+parameters->mobility: 0.004
+parameters->a: 1.0
+parameters->b: 1.0
+parameters->sigma: 24.5
 
 refinement->interface: 12
 refinement->bulk: 2
@@ -47,4 +53,4 @@ ch->output[1,1]->animation:          1
 
 adapt->timestep:    0.01
 adapt->start time:  0.0
-adapt->end time:    3.0
+adapt->end time:    3.5

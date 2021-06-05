@@ -51,7 +51,7 @@ int main(int argc, char** argv)
 
     auto invTau = std::ref(probInstat.invTau());
     auto phi = prob.solution(_0,0);
-    auto phiOld = probInstat.oldSolution(_0,0);
+//    auto phiOld = probInstat.oldSolution(_0,0);  //replaced by phi
     auto gradPhi = gradientOf(phi);
 
     auto _phi =makeTreePath(_0,0);
@@ -64,12 +64,14 @@ int main(int argc, char** argv)
 
     prob.addMatrixOperator(zot(invTau), _phi, _phi);
     prob.addMatrixOperator(opFconv, _phi, _v);
-    prob.addVectorOperator(zot(phiOld * invTau), _phi);
+    prob.addVectorOperator(zot(phi * invTau), _phi);
 
     double M = Parameters::get<double>("parameters->mobility").value_or(0.4);
+
     prob.addMatrixOperator(sot(M), _phi, _mu);
     prob.addMatrixOperator(zot(1.0), _mu, _mu);
 
+    double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*3*sqrt(2);
     double a = Parameters::get<double>("parameters->a").value_or(1.0);
     double b = Parameters::get<double>("parameters->b").value_or(1.0);
 
@@ -100,7 +102,7 @@ int main(int argc, char** argv)
 
 // <1/tau * u^old, v>
     auto opTimeOld = makeOperator(tag::testvec{},
-                                  (phi*density_inner + (1-phi)*density_outer)* (invTau * probInstat.oldSolution(_v)
+                                  (phi*density_inner + (1-phi)*density_outer)* (invTau * prob.solution(_v)
                                   +FieldVector<double,  WORLDDIM>{0.0,0.98}));
     prob.addVectorOperator(opTimeOld, _v);
 
@@ -130,10 +132,10 @@ int main(int argc, char** argv)
     auto opP = makeOperator(tag::divtestvec_trial{}, 1.0);
     prob.addMatrixOperator(opP, makeTreePath(_1,_0), makeTreePath(_1,_1));
 
-    double sigma = 24.5*3/(2* sqrt(2));
+
     for (int i=0; i<WORLDDIM; i++){
-        auto partPhiOld = partialDerivativeOf(phi,i);
-        prob.addMatrixOperator(zot(-sigma*partPhiOld), makeTreePath(_1,_0, i), _mu);
+        auto partphi = partialDerivativeOf(phi,i);
+        prob.addMatrixOperator(zot(-sigma*partphi), makeTreePath(_1,_0, i), _mu);
     }
 
     int ref_int  = Parameters::get<int>("refinement->interface").value_or(10);
@@ -144,19 +146,28 @@ int main(int argc, char** argv)
                               }, phi));
     prob.addMarker(marker);
 
+    double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
     double radius1 = Parameters::get<double>("parameters->radius1").value_or(0.15);
     double radius2 = Parameters::get<double>("parameters->radius2").value_or(0.25);
+
+    //set initial value for Benchmark
+    radius1 = radius;
+    radius2 = radius;
+
+    double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
+    double centery = Parameters::get<double>("parameters->centery").value_or(0.);
+
     for (int i = 0; i < 6; ++i) {
-        phi << [eps,radius1,radius2](auto const& x) {
+        phi << [eps,radius1,radius2, centerx, centery](auto const& x) {
             using Math::sqr;
-            return 0.5*(1 - std::tanh((radius1+radius2)*(std::sqrt(sqr((x[0]-0.)/radius1) + sqr((x[1]-0.)/radius2)) - 1.0)/(4*std::sqrt(2.0)*eps)));
+            return 0.5*(1 - std::tanh((radius1+radius2)*(std::sqrt(sqr((x[0]-centerx)/radius1) + sqr((x[1]-centery)/radius2)) - 1.0)/(4*std::sqrt(2.0)*eps)));
         };
         prob.markElements(adaptInfo);
         prob.adaptGrid(adaptInfo);
     }
 
     //boundary condition
-    prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>1-1.e-8);}, _v, _v, 0.);
+    prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>1-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
     prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
 
     AdaptInstationary adapt("adapt", prob, adaptInfo, probInstat, adaptInfo);
