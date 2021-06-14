@@ -10,6 +10,8 @@
 #include <amdis/localoperators/StokesOperator.hpp>
 
 #include <dune/grid/albertagrid.hh>
+#include <cmath>
+#include <typeinfo>
 //#include <dune/alugrid/grid.hh>
 //#include <dune/foamgrid/foamgrid.hh>
 
@@ -37,7 +39,7 @@ int main(int argc, char** argv)
     //Dune::YaspGrid<2> grid{ {1.,2.}, {8,8}};
 
     auto stokesBasis = composite(power<WORLDDIM>(lagrange<2>()), lagrange<1>());
-    auto chBasis = power<2>(lagrange<1>());
+    auto chBasis = power<2>(lagrange<2>());
 
     auto chnsBasis = composite(chBasis, stokesBasis);
 
@@ -49,26 +51,48 @@ int main(int argc, char** argv)
 
     AdaptInfo adaptInfo("adapt");
 
+    //FUNCTIONS from the previous time step
     auto invTau = std::ref(probInstat.invTau());
     auto phi = prob.solution(_0,0);
 //    auto phiOld = probInstat.oldSolution(_0,0);  //replaced by phi
     auto gradPhi = gradientOf(phi);
+    auto v = prob.solution(_1,_0);
 
+    auto upper_bound = [](auto const& x){
+        return Dune::FieldVector<double,1>{1.};
+    };
+    auto lower_bound = [](auto const& x) {
+        return Dune::FieldVector<double, 1>{0.};
+    };
+    auto phiProjected = max(min(evalAtQP(phi),upper_bound),lower_bound);
+    //auto phiProjected = phi;
+
+    //PATHS
     auto _phi =makeTreePath(_0,0);
     auto _mu =makeTreePath(_0,1);
     auto _v =makeTreePath(_1,_0);
     auto _p =makeTreePath(_1,1);
 
-
-    auto opFconv = makeOperator(tag::test_trialvec{}, gradPhi);
-
+    //FIRST EQUATION
+    //time derivative
     prob.addMatrixOperator(zot(invTau), _phi, _phi);
-    prob.addMatrixOperator(opFconv, _phi, _v);
     prob.addVectorOperator(zot(phi * invTau), _phi);
 
-    double M = Parameters::get<double>("parameters->mobility").value_or(0.4);
+    //Coupling term
+    //auto opFconv = makeOperator(tag::test_gradtrial{}, v);
+    //prob.addMatrixOperator(opFconv, _phi, _phi);
 
-    prob.addMatrixOperator(sot(M), _phi, _mu);
+    //auto opFconv = makeOperator(tag::test_gradtrial{}, FieldVector<double, 2>{0, 0.98});
+    //prob.addMatrixOperator(opFconv, _phi, _phi);
+
+    auto opFconv = makeOperator(tag::test_trialvec{}, gradPhi, 5);
+    prob.addMatrixOperator(opFconv, _phi, _v);                          //Coupling term
+
+    //mobility term
+    double m = Parameters::get<double>("parameters->mobility").value_or(0.4);
+    prob.addMatrixOperator(sot(m*pow<2>(phi)*pow<2>(FieldVector<double,1>{1.}-phi)), _phi, _mu);
+
+    //SECOND EQUATION
     prob.addMatrixOperator(zot(1.0), _mu, _mu);
 
     double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*3*sqrt(2);
@@ -79,65 +103,90 @@ int main(int argc, char** argv)
     prob.addMatrixOperator(sot(-a*eps), _mu, _phi);
 
     //double Well potential: phi^2(1-phi)^2
+    //TODO: Change expression as well to vector? - Not necessary - why not?
     auto opFimpl = zot(-b/eps * (2 + 12*phi*(phi - 1)));
     prob.addMatrixOperator(opFimpl, _mu, _phi);
 
     auto opFexpl = zot(b/eps * pow<2>(phi)*(6 - 8*phi));
     prob.addVectorOperator(opFexpl, _mu);
 
-    /*
-    double viscosity = 1;
-    auto opStokes = makeOperator(tag::stokes{0}, viscosity);
-    prob.addMatrixOperator(opStokes, _1, _1);*/
+    //THIRD EQUATION
 
     // define a constant fluid density
     double density_inner = 100.0;
-    double density_outer =1000.0;
+    double density_outer = 1000.0;
+    auto density = density_inner*phiProjected+(Dune::FieldVector<double,1>{1.}-phiProjected)*density_outer;
 
 
 // <1/tau * u, v>
     auto opTime = makeOperator(tag::testvec_trialvec{},
-                               ((phi*density_inner + (1-phi)*density_outer)) * invTau);
+                               density* invTau, 5);
     prob.addMatrixOperator(opTime, _v, _v);
 
 // <1/tau * u^old, v>
     auto opTimeOld = makeOperator(tag::testvec{},
-                                  (phi*density_inner + (1-phi)*density_outer)* (invTau * prob.solution(_v)
-                                  +FieldVector<double,  WORLDDIM>{0.0,0.98}));
+                                  density * invTau * prob.solution(_v), 5);
     prob.addVectorOperator(opTimeOld, _v);
 
-    for (int i = 0; i < Grid::dimensionworld; ++i) {
+
+     for (int i = 0; i < Grid::dimensionworld; ++i) {
         // <(u^old * nabla)u_i, v_i>
         auto opNonlin = makeOperator(tag::test_gradtrial{},
-                                     ((phi*density_inner + (1-phi)*density_outer)) * prob.solution(_v));
+                                     density * prob.solution(_v), 5);
         prob.addMatrixOperator(opNonlin, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
     }
 
+
 // define  a fluid viscosity
-    double viscosity = 1.0;
     double outer_visc = 10.;
     double inner_visc = 1.;
 
+    auto viscosity = inner_visc*phiProjected+outer_visc*(FieldVector<double,1>{1.}-phiProjected);
+
+  //Laplace term
+    /*
     for (int i = 0; i < Grid::dimensionworld; ++i) {
         // <viscosity*grad(u_i), grad(v_i)>
-        auto opL = sot(inner_visc*phi+outer_visc*(1-phi));
+        auto opL = sot(viscosity, 1);
         prob.addMatrixOperator(opL, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
     }
+     */
+
+    auto opVLaplace = makeOperator(tag::divtestvec_divtrialvec{},viscosity, 5);
+    prob.addMatrixOperator(opVLaplace, _v, _v);
+
+   // <q, d_i(u_i)>
+    auto opDiv = makeOperator(tag::test_divtrialvec{}, 1.0);
+   prob.addMatrixOperator(opDiv, makeTreePath(_1,_1), makeTreePath(_1,_0));
+
+   /*
+   auto opV= makeOperator(tag::testvec_trialvec{}, 1.);
+   prob.addMatrixOperator(opV, makeTreePath(_1,_0), makeTreePath(_1,_0));
+
+    auto opP= makeOperator(tag::test_trial{}, 1.);
+    prob.addMatrixOperator(opP, makeTreePath(_1,_1), makeTreePath(_1,_1));*/
 
     // <d_i(v_i), p>
-    auto opDiv = makeOperator(tag::test_divtrialvec{}, 1.0);
-    prob.addMatrixOperator(opDiv, makeTreePath(_1,_1), makeTreePath(_1,_0));
-
-    // <q, d_i(u_i)>
     auto opP = makeOperator(tag::divtestvec_trial{}, 1.0);
     prob.addMatrixOperator(opP, makeTreePath(_1,_0), makeTreePath(_1,_1));
 
-
+    //coupling term
+/*
     for (int i=0; i<WORLDDIM; i++){
         auto partphi = partialDerivativeOf(phi,i);
         prob.addMatrixOperator(zot(-sigma*partphi), makeTreePath(_1,_0, i), _mu);
     }
+*/
+    auto opCoup = makeOperator(tag::testvec_trial{}, -sigma*gradPhi);
+    prob.addMatrixOperator(opCoup, _v, _mu);
 
+    //extern force (gravitational force)
+    auto extForce = [](auto const& x) { return FieldVector<double,  WORLDDIM>{0.0,- 0.98};};
+    auto opForce = makeOperator(tag::testvec {}, density*extForce, 5);
+    prob.addVectorOperator(opForce, _v);
+
+
+    //Initial Value and Boundary
     int ref_int  = Parameters::get<int>("refinement->interface").value_or(10);
     int ref_bulk = Parameters::get<int>("refinement->bulk").value_or(2);
     GridFunctionMarker marker("interface", prob.grid(),
@@ -167,7 +216,7 @@ int main(int argc, char** argv)
     }
 
     //boundary condition
-    prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>1-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
+    prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
     prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
 
     AdaptInstationary adapt("adapt", prob, adaptInfo, probInstat, adaptInfo);
