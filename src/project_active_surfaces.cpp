@@ -12,7 +12,7 @@
 #include <dune/grid/albertagrid.hh>
 #include <cmath>
 #include <typeinfo>
-//#include <dune/alugrid/grid.hh>
+#include <dune/alugrid/grid.hh>
 //#include <dune/foamgrid/foamgrid.hh>
 
 using namespace AMDiS;
@@ -36,7 +36,7 @@ int main(int argc, char** argv)
     Environment env(argc, argv);
 
     auto grid = MeshCreator<Grid>("chMesh").create();
-    //Dune::YaspGrid<2> grid{ {1.,2.}, {8,8}};
+    //Dune::YaspGrid<2> grid{ {1.,2.}, {1,2}};
 
     auto stokesBasis = composite(power<WORLDDIM>(lagrange<2>()), lagrange<1>());
     auto chBasis = power<2>(lagrange<2>());
@@ -90,12 +90,13 @@ int main(int argc, char** argv)
 
     //mobility term
     double m = Parameters::get<double>("parameters->mobility").value_or(0.4);
-    prob.addMatrixOperator(sot(m*pow<2>(phi)*pow<2>(FieldVector<double,1>{1.}-phi)), _phi, _mu);
+  //prob.addMatrixOperator(sot(m*pow<2>(phi)*pow<2>(FieldVector<double,1>{1.}-phi)), _phi, _mu);
+    prob.addMatrixOperator(sot(m), _phi, _mu);
 
     //SECOND EQUATION
     prob.addMatrixOperator(zot(1.0), _mu, _mu);
 
-    double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*3*sqrt(2);
+    double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)/3.;
     double a = Parameters::get<double>("parameters->a").value_or(1.0);
     double b = Parameters::get<double>("parameters->b").value_or(1.0);
 
@@ -104,10 +105,10 @@ int main(int argc, char** argv)
 
     //double Well potential: phi^2(1-phi)^2
     //TODO: Change expression as well to vector? - Not necessary - why not?
-    auto opFimpl = zot(-b/eps * (2 + 12*phi*(phi - 1)));
+    auto opFimpl = zot(-b/eps * (FieldVector<double,1>{2.} + 12*phi*(phi - FieldVector<double,1>{1.})));
     prob.addMatrixOperator(opFimpl, _mu, _phi);
 
-    auto opFexpl = zot(b/eps * pow<2>(phi)*(6 - 8*phi));
+    auto opFexpl = zot(b/eps * pow<2>(phi)*(FieldVector<double,1>{6.} - 8*phi));
     prob.addVectorOperator(opFexpl, _mu);
 
     //THIRD EQUATION
@@ -129,7 +130,7 @@ int main(int argc, char** argv)
     prob.addVectorOperator(opTimeOld, _v);
 
 
-     for (int i = 0; i < Grid::dimensionworld; ++i) {
+     for (int i = 0; i < WORLDDIM; ++i) {
         // <(u^old * nabla)u_i, v_i>
         auto opNonlin = makeOperator(tag::test_gradtrial{},
                                      density * prob.solution(_v), 5);
@@ -181,7 +182,7 @@ int main(int argc, char** argv)
     prob.addMatrixOperator(opCoup, _v, _mu);
 
     //extern force (gravitational force)
-    auto extForce = [](auto const& x) { return FieldVector<double,  WORLDDIM>{0.0,- 0.98};};
+    auto extForce = [](auto const& x) { return FieldVector<double,  WORLDDIM>{0.0, - 0.98};};
     auto opForce = makeOperator(tag::testvec {}, density*extForce, 5);
     prob.addVectorOperator(opForce, _v);
 
@@ -195,21 +196,31 @@ int main(int argc, char** argv)
                               }, phi));
     prob.addMarker(marker);
 
-    double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
-    double radius1 = Parameters::get<double>("parameters->radius1").value_or(0.15);
-    double radius2 = Parameters::get<double>("parameters->radius2").value_or(0.25);
+    /* Set old initial value
+     double radius1 = Parameters::get<double>("parameters->radius1").value_or(0.15);
+     double radius2 = Parameters::get<double>("parameters->radius2").value_or(0.25);
+     for (int i = 0; i < 6; ++i)
+     {
+        phi << [eps,radius1,radius2](auto const& x)
+        {
+        using Math::sqr;
+        return 0.5*(1 - std::tanh((radius1+radius2)*(std::sqrt(sqr(x[0]/radius1) + sqr(x[1]/radius2)) - 1.0)/(4*std::sqrt(2.0)*eps)));
+        };
+     prob.markElements(adaptInfo);
+     prob.adaptGrid(adaptInfo);
+     }
+     */
 
     //set initial value for Benchmark
-    radius1 = radius;
-    radius2 = radius;
+    double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
 
     double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
     double centery = Parameters::get<double>("parameters->centery").value_or(0.);
 
-    for (int i = 0; i < 6; ++i) {
-        phi << [eps,radius1,radius2, centerx, centery](auto const& x) {
+    for (int i = 0; i < 10; ++i) {
+        phi << [eps, radius, centerx, centery](auto const& x) {
             using Math::sqr;
-            return 0.5*(1 - std::tanh((radius1+radius2)*(std::sqrt(sqr((x[0]-centerx)/radius1) + sqr((x[1]-centery)/radius2)) - 1.0)/(4*std::sqrt(2.0)*eps)));
+            return 0.5*(1 - std::tanh((std::sqrt(sqr(x[0]-centerx) + sqr(x[1]-centery))- radius)/(std::sqrt(2.0)*eps)));
         };
         prob.markElements(adaptInfo);
         prob.adaptGrid(adaptInfo);

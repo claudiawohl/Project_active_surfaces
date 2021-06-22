@@ -1,20 +1,20 @@
 dimension of world:   2
 
 chMesh->macro file name:    ./macro/benchmark.2d
-chMesh->global refinements: 8
+chMesh->global refinements: 3
 
 parameters->radius:  0.25
 parameters->radius1: 0.3
 parameters->radius2: 0.5
-parameters->epsilon: 0.01
+parameters->epsilon: 0.02
 parameters->centerx: 0.5
 parameters->centery: 0.5
-parameters->mobility: 0.04
+parameters->mobility: 0.002
 parameters->a: 1.0
 parameters->b: 1.0
 parameters->sigma: 24.5
 
-refinement->interface: 12
+refinement->interface: 10
 refinement->bulk: 2
 
 ch->mesh:                       chMesh
