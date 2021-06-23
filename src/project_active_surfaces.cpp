@@ -96,7 +96,7 @@ int main(int argc, char** argv)
     //SECOND EQUATION
     prob.addMatrixOperator(zot(1.0), _mu, _mu);
 
-    double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)/3.;
+    double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.;
     double a = Parameters::get<double>("parameters->a").value_or(1.0);
     double b = Parameters::get<double>("parameters->b").value_or(1.0);
 
