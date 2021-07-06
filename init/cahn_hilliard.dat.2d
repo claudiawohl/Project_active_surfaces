@@ -9,7 +9,7 @@ parameters->radius2: 0.5
 parameters->epsilon: 0.02
 parameters->centerx: 0.5
 parameters->centery: 0.5
-parameters->mobility: 0.002
+parameters->mobility: 0.004
 parameters->a: 1.0
 parameters->b: 1.0
 parameters->sigma: 24.5
@@ -50,6 +50,13 @@ ch->output[1,1]->output directory:   output
 ch->output[1,1]->name:               p
 ch->output[1,1]->mode:               1
 ch->output[1,1]->animation:          1
+
+ch->output[2]->format:             vtk
+ch->output[2]->filename:           c.2d
+ch->output[2]->output directory:   output
+ch->output[2]->name:               c
+ch->output[2]->mode:               1
+ch->output[2]->animation:          1
 
 adapt->timestep:    0.05
 adapt->start time:  0.0
