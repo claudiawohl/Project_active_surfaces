@@ -12,6 +12,10 @@ parameters->centery: 0.5
 parameters->mobility: 0.004
 parameters->a: 1.0
 parameters->b: 1.0
+parameters->innerdensity:0
+parameters->outerdensity:0
+parameters->innervelocity:1
+parameters->outervelocity:10
 parameters->sigma: 24.5
 
 refinement->interface: 10

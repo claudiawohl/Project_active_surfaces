@@ -117,8 +117,8 @@ int main(int argc, char** argv)
     //THIRD EQUATION
 
     // define a constant fluid density
-    double density_inner = 100.0;
-    double density_outer = 1000.0;
+    double density_inner = Parameters::get<double>("parameters->innerdensity").value_or(100.);
+    double density_outer = Parameters::get<double>("parameters->outerdensity").value_or(1000.);
     auto density = density_inner*phiProjected+(1.-phiProjected)*density_outer;
 
 // <1/tau * u, v>
@@ -141,29 +141,14 @@ int main(int argc, char** argv)
 
 
 // define  a fluid viscosity
-    double outer_visc = 10.;
-    double inner_visc = 1.;
+    double outer_visc = Parameters::get<double>("parameters->outerviscosity").value_or(10.);
+    double inner_visc = Parameters::get<double>("parameters->innerviscosity").value_or(1.);
 
     auto viscosity = inner_visc*phiProjected+outer_visc*(1.-phiProjected);
 
-  //Laplace term
-    /*
-    for (int i = 0; i < Grid::dimensionworld; ++i) {
-        // <viscosity*grad(u_i), grad(v_i)>
-        auto opL = sot(viscosity, 1);
-        prob.addMatrixOperator(opL, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
-    }
-     */
-    auto opVLaplace = makeOperator(tag::divtestvec_divtrialvec{},viscosity, 5);
-    prob.addMatrixOperator(opVLaplace, _v, _v);
-
-   // <q, d_i(u_i)>
-    auto opDiv = makeOperator(tag::test_divtrialvec{}, 1.0);
-    prob.addMatrixOperator(opDiv, _p, _v);
-
-    // <d_i(v_i), p>
-    auto opP = makeOperator(tag::divtestvec_trial{}, 1.0);
-    prob.addMatrixOperator(opP, _v, _p);
+  //Stokes Operator
+    auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
+    prob.addMatrixOperator(opStokes, _1, _1);
 
     //coupling term
 /*
@@ -195,7 +180,7 @@ int main(int argc, char** argv)
     prob.addMatrixOperator(opConcVelTime, _c, _c);
 
     //Laplace term
-    auto opConcLaplacian1 = makeOperator(tag::gradtest_gradtrial {}, 5*absGradPhi * Id,5);
+    auto opConcLaplacian1 = makeOperator(tag::gradtest_gradtrial {}, absGradPhi * Id,5);
     prob.addMatrixOperator(opConcLaplacian1, _c, _c);
     auto opConcLaplacian2 = makeOperator(tag::gradtest_gradtrial {}, - absGradPhi * NxN,5);
     //prob.addMatrixOperator(opConcLaplacian2, _c, _c);
@@ -216,11 +201,16 @@ int main(int argc, char** argv)
     double constant2 = 0.;
     double constant3 = 0.;
 
-    auto opCoupC1 = makeOperator(tag::testvec_trialvec {}, constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c))), 5);
-    prob.addMatrixOperator(opCoupC1, _v, _v);
-    auto opCoupC2 = makeOperator(tag::testvec_trialvec {}, (-1.)*constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*NxN, 5);
-    prob.addMatrixOperator(opCoupC2, _v, _v);
+    /* with projection operator: Which sign???
+    auto opCoupC1 = makeOperator(tag::testvec {}, constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c))), 5);
+    prob.addVectorOperator(opCoupC1, _v);
+    auto opCoupC2 = makeOperator(tag::testvec {}, (-1.)*constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*NxN, 5);
+    prob.addVectorOperator(opCoupC2, _v);
+     */
 
+    //Hill function term
+    auto opCoupC2 = makeOperator(tag::testvec_trial {}, (-1.)*constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*gradPhi, 5);
+    prob.addMatrixOperator(opCoupC2, _v, _mu);
 
     //Initial Value and Boundary
     int ref_int  = Parameters::get<int>("refinement->interface").value_or(10);
@@ -261,7 +251,7 @@ int main(int argc, char** argv)
         prob.adaptGrid(adaptInfo);
     }
 
-    c << [](auto const& x){return 0.1;};
+    c << [](auto const& x){return 10;};
 
     //boundary condition
     prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
