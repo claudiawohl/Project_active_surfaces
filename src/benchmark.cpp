@@ -118,7 +118,6 @@ int main(int argc, char** argv)
     double density_outer = 1000.0;
     auto density = density_inner*phiProjected+(Dune::FieldVector<double,1>{1.}-phiProjected)*density_outer;
 
-
 // <1/tau * u, v>
     auto opTime = makeOperator(tag::testvec_trialvec{},
                                density* invTau, 5);
@@ -129,7 +128,6 @@ int main(int argc, char** argv)
                                   density * invTau * prob.solution(_v), 5);
     prob.addVectorOperator(opTimeOld, _v);
 
-
     for (int i = 0; i < WORLDDIM; ++i) {
         // <(u^old * nabla)u_i, v_i>
         auto opNonlin = makeOperator(tag::test_gradtrial{},
@@ -137,55 +135,15 @@ int main(int argc, char** argv)
         prob.addMatrixOperator(opNonlin, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
     }
 
-
-// define  a fluid viscosity
+   //define  a fluid viscosity
     double outer_visc = 10.;
     double inner_visc = 1.;
-
     auto viscosity = inner_visc*phiProjected+outer_visc*(FieldVector<double,1>{1.}-phiProjected);
 
-    //Laplace term
-    //auto opVLaplace = makeOperator(tag::divtestvec_divtrialvec{},viscosity, 5);
-    //prob.addMatrixOperator(opVLaplace, _v, _v);
+    //Stokes Operator
+    auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
+    prob.addMatrixOperator(opStokes, _1, _1);
 
-    for (int i = 0; i < WORLDDIM; ++i) {
-        // <viscosity*grad(u_i), grad(v_i)>
-        auto opL = sot(viscosity, 5);
-        prob.addMatrixOperator(opL, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
-    }
-
-    for (int i = 0; i < WORLDDIM; ++i) {
-        for (int j = 0; j < WORLDDIM; ++j) {
-            // <viscosity*grad(u_i), grad(v_j)>
-            auto opL = makeOperator(tag::partialtest_partialtrial{ j, i }, viscosity, 5);
-            prob.addMatrixOperator(opL, makeTreePath(_1, _0, i), makeTreePath(_1, _0, j));
-        }
-    }
-
-
-
-    // <q, d_i(u_i)>
-    auto opDiv = makeOperator(tag::test_divtrialvec{}, 1.0);
-    prob.addMatrixOperator(opDiv, makeTreePath(_1,_1), makeTreePath(_1,_0));
-
-    /*
-    auto opV= makeOperator(tag::testvec_trialvec{}, 1.);
-    prob.addMatrixOperator(opV, makeTreePath(_1,_0), makeTreePath(_1,_0));
-
-     auto opP= makeOperator(tag::test_trial{}, 1.);
-     prob.addMatrixOperator(opP, makeTreePath(_1,_1), makeTreePath(_1,_1));*/
-
-    // <d_i(v_i), p>
-    auto opP = makeOperator(tag::divtestvec_trial{}, 1.0);
-    prob.addMatrixOperator(opP, makeTreePath(_1,_0), makeTreePath(_1,_1));
-
-    //coupling term
-/*
-    for (int i=0; i<WORLDDIM; i++){
-        auto partphi = partialDerivativeOf(phi,i);
-        prob.addMatrixOperator(zot(-sigma*partphi), makeTreePath(_1,_0, i), _mu);
-    }
-*/
     auto opCoup = makeOperator(tag::testvec_trial{}, -sigma*gradPhi);
     prob.addMatrixOperator(opCoup, _v, _mu);
 
@@ -237,7 +195,7 @@ int main(int argc, char** argv)
     //boundary condition
     prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
     prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
-    prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 && x[1]<1.e-8);}, makeTreePath(_1,_1), makeTreePath(_1,_1), 0.); //set boundary for pressure - ensures regularity
+    //prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 && x[1]<1.e-8);}, makeTreePath(_1,_1), makeTreePath(_1,_1), 0.); //set boundary for pressure - ensures regularity
 
     AdaptInstationary adapt("adapt", prob, adaptInfo, probInstat, adaptInfo);
     adapt.adapt();
