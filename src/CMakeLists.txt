@@ -18,3 +18,10 @@ add_amdis_executable(
         DIM 2
         DOW 2
         ALBERTA_GRID)
+
+add_amdis_executable(
+        NAME "cahn_hilliard"
+        SOURCES cahn_hilliard.cc
+        DIM 3
+        DOW 3
+        ALBERTA_GRID)
