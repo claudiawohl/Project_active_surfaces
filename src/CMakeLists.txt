@@ -22,6 +22,6 @@ add_amdis_executable(
 add_amdis_executable(
         NAME "cahn_hilliard"
         SOURCES cahn_hilliard.cc
-        DIM 3
-        DOW 3
+        DIM 2
+        DOW 2
         ALBERTA_GRID)

@@ -27,6 +27,11 @@ int main(int argc, char** argv)
 
   AdaptInfo adaptInfo("adapt");
 
+  bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
+
+  double centre = 0.;
+  if (axisymmetric) {centre = 1.;};
+
   auto invTau = std::ref(probInstat.invTau());
   auto phi = prob.solution(0);
   auto phiOld = probInstat.oldSolution(0);
@@ -36,17 +41,14 @@ int main(int argc, char** argv)
 
   double M = Parameters::get<double>("parameters->mobility").value_or(1.0);
   prob.addMatrixOperator(sot(M), 0, 1);
-  if (WORLDDIM == 3)
+  if (axisymmetric)
     {
-        auto extra3D = [M](auto const& x){
-            return M/x[0];
+        auto extra3D = [M, centre](auto const& x){
+            return -M/(x[0]-centre);
         };
 
-        auto opRemoveAngle = makeOperator(tag::partialtest_partialtrial {1,1}, M);
-        prob.addMatrixOperator(opRemoveAngle, 0, 1);
-
-        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, extra3D);
-        prob.addMatrixOperator(opAddExtra, 1, 0);
+        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, extra3D, 3);
+        prob.addMatrixOperator(opAddExtra, 0, 1);
     };
 
   prob.addMatrixOperator(zot(1.0), 1, 1);
@@ -56,17 +58,13 @@ int main(int argc, char** argv)
 
   double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
   prob.addMatrixOperator(sot(-a*eps), 1, 0);
-  if (WORLDDIM == 3)
+  if (axisymmetric)
   {
-      auto extra3D = [a, eps](auto const& x){
-          double factor = 1.;
-          return -a*eps/x[0];
+      auto extra3D = [a, eps, centre](auto const& x){
+          return a*eps/(x[0]-centre);
       };
 
-    auto opRemoveAngle = makeOperator(tag::partialtest_partialtrial {1,1}, -a*eps);
-    prob.addMatrixOperator(opRemoveAngle, 1, 0);
-
-    auto opAddExtra = makeOperator(tag::test_partialtrial{0}, extra3D);
+    auto opAddExtra = makeOperator(tag::test_partialtrial{0}, extra3D, 3);
     prob.addMatrixOperator(opAddExtra, 1, 0);
   };
 
@@ -87,9 +85,9 @@ int main(int argc, char** argv)
   double radius1 = Parameters::get<double>("parameters->radius1").value_or(0.15);
   double radius2 = Parameters::get<double>("parameters->radius2").value_or(0.25);
   for (int i = 0; i < 6; ++i) {
-    phi << [eps,radius1,radius2](auto const& x) {
+    phi << [eps,radius1,radius2, centre](auto const& x) {
       using Math::sqr;
-      return 0.5*(1 - std::tanh((radius1+radius2)*(std::sqrt(sqr(x[0]/radius1) + sqr(x[1]/radius2)) - 1.0)/(4*std::sqrt(2.0)*eps)));
+      return 0.5*(1 - std::tanh((radius1+radius2)*(std::sqrt(sqr((x[0]+centre)/radius1) + sqr(x[1]/radius2)) - 1.0)/(4*std::sqrt(2.0)*eps)));
     };
     prob.markElements(adaptInfo);
     prob.adaptGrid(adaptInfo);

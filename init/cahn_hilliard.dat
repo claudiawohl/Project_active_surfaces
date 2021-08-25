@@ -1,8 +1,9 @@
 dimension of world:   2
 
-chMesh->macro file name:    ./macro/cylinder.3d
+chMesh->macro file name:    ./macro/macro.square.2d
 chMesh->global refinements: 8
 
+parameters->axisymmetric: true
 parameters->radius:  0.5
 parameters->radius1: 0.4
 parameters->radius2: 0.6
