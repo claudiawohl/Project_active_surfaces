@@ -30,6 +30,10 @@ using Grid = Dune::AlbertaGrid<GRIDDIM, WORLDDIM>;
 auto _0 = Dune::Indices::_0;
 auto _1 = Dune::Indices::_1;
 
+auto axisymmFunction = [](auto constant, double centre){
+    return [constant, centre](auto const& x) {return constant/(x[0]-centre);};
+};
+
 int main(int argc, char** argv)
 {
     Environment env(argc, argv);
@@ -56,6 +60,11 @@ int main(int argc, char** argv)
 //    auto phiOld = probInstat.oldSolution(_0,0);  //replaced by phi
     auto gradPhi = gradientOf(phi);
     auto v = prob.solution(_1,_0);
+
+    bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
+
+    double centre = 0.;
+    if (axisymmetric) {centre = 0.;};
 
     auto upper_bound = [](auto const& x){
         return Dune::FieldVector<double,1>{1.};
@@ -92,6 +101,12 @@ int main(int argc, char** argv)
     //prob.addMatrixOperator(sot(m*pow<2>(phi)*pow<2>(FieldVector<double,1>{1.}-phi)), _phi, _mu);
     prob.addMatrixOperator(sot(m), _phi, _mu);
 
+    if (axisymmetric)
+    {
+        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, axisymmFunction(-m, centre), 3);
+        prob.addMatrixOperator(opAddExtra, _phi, _mu);
+    };
+
     //SECOND EQUATION
     prob.addMatrixOperator(zot(1.0), _mu, _mu);
 
@@ -102,6 +117,12 @@ int main(int argc, char** argv)
 
     double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
     prob.addMatrixOperator(sot(-a*eps), _mu, _phi);
+
+    if (axisymmetric)
+    {
+        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, axisymmFunction(a*eps, centre), 3);
+        prob.addMatrixOperator(opAddExtra, _mu, _phi);
+    };
 
     //double Well potential: phi^2(1-phi)^2
     //TODO: Change expression as well to vector? - Not necessary - why not?
@@ -144,6 +165,21 @@ int main(int argc, char** argv)
     auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
     prob.addMatrixOperator(opStokes, _1, _1);
 
+    if(axisymmetric){
+
+        auto extra3D = [centre](auto const& x){
+            return -1./(x[0]-centre);
+        };
+
+      auto opExtraX = makeOperator(tag::test_partialtrial{0}, viscosity*extra3D, 5);
+      auto opExtraY = makeOperator(tag::test_partialtrial{1}, viscosity*extra3D, 5);
+      auto opExtraGrad = makeOperator(tag::testvec_gradtrial{}, viscosity*extra3D, 5);
+
+      prob.addMatrixOperator(opExtraX, makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
+      prob.addMatrixOperator(opExtraY, makeTreePath(_1, _0, 1), makeTreePath(_1, _0, 0));
+      prob.addMatrixOperator(opExtraGrad, _v, makeTreePath(_1, _0, 0));
+    };
+
     auto opCoup = makeOperator(tag::testvec_trial{}, -sigma*gradPhi);
     prob.addMatrixOperator(opCoup, _v, _mu);
 
@@ -181,6 +217,7 @@ int main(int argc, char** argv)
     double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
 
     double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
+    if (axisymmetric) {centerx = centre;};
     double centery = Parameters::get<double>("parameters->centery").value_or(0.);
 
     for (int i = 0; i < 10; ++i) {

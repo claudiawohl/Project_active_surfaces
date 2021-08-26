@@ -3,6 +3,7 @@ dimension of world:   2
 chMesh->macro file name:    ./macro/benchmark.2d
 chMesh->global refinements: 3
 
+parameters->axisymmetric:  true
 parameters->radius:  0.25
 parameters->radius1: 0.3
 parameters->radius2: 0.5
