@@ -110,7 +110,6 @@ int main(int argc, char** argv)
     //SECOND EQUATION
     prob.addMatrixOperator(zot(1.0), _mu, _mu);
 
-    //TODO: Why is the multiplication with 3/sqrt(2) correct? Is it?
     double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*3*sqrt(2.);
     double a = Parameters::get<double>("parameters->a").value_or(1.0);
     double b = Parameters::get<double>("parameters->b").value_or(1.0);
@@ -125,11 +124,10 @@ int main(int argc, char** argv)
     };
 
     //double Well potential: phi^2(1-phi)^2
-    //TODO: Change expression as well to vector? - Not necessary - why not?
-    auto opFimpl = zot(-b/eps * (FieldVector<double,1>{2.} + 12*phi*(phi - FieldVector<double,1>{1.})));
+    auto opFimpl = zot(-b/eps * (2. + 12*phi*(phi - 1.)));
     prob.addMatrixOperator(opFimpl, _mu, _phi);
 
-    auto opFexpl = zot(b/eps * pow<2>(phi)*(FieldVector<double,1>{6.} - 8*phi));
+    auto opFexpl = zot(b/eps * pow<2>(phi)*(6. - 8.*phi));
     prob.addVectorOperator(opFexpl, _mu);
 
     //THIRD EQUATION
@@ -137,7 +135,7 @@ int main(int argc, char** argv)
     // define a constant fluid density
     double density_inner = 100.0;
     double density_outer = 1000.0;
-    auto density = density_inner*phiProjected+(Dune::FieldVector<double,1>{1.}-phiProjected)*density_outer;
+    auto density = density_inner*phiProjected+(1.-phiProjected)*density_outer;
 
 // <1/tau * u, v>
     auto opTime = makeOperator(tag::testvec_trialvec{},
@@ -159,7 +157,7 @@ int main(int argc, char** argv)
    //define  a fluid viscosity
     double outer_visc = 10.;
     double inner_visc = 1.;
-    auto viscosity = inner_visc*phiProjected+outer_visc*(FieldVector<double,1>{1.}-phiProjected);
+    auto viscosity = inner_visc*phiProjected+outer_visc*(1.-phiProjected);
 
     //Stokes Operator
     auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
