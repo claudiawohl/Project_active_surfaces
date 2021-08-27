@@ -62,6 +62,15 @@ int main(int argc, char** argv)
 
     AdaptInfo adaptInfo("adapt");
 
+    bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
+
+    double centre = 0.;
+    if (axisymmetric) {centre = 0.;};
+
+    auto axisymmFunction = [centre](auto constant){
+        return [constant, centre](auto const& x) {return constant/(x[0]-centre);};
+    };
+
     /// FUNCTIONS from the previous time step
     auto invTau = std::ref(probInstat.invTau());
     auto phi = prob.solution(_0,0);
@@ -113,6 +122,12 @@ int main(int argc, char** argv)
   //prob.addMatrixOperator(sot(m*pow<2>(phi)*pow<2>(FieldVector<double,1>{1.}-phi)), _phi, _mu);
     prob.addMatrixOperator(sot(m), _phi, _mu);
 
+    if (axisymmetric)
+    {
+        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, axisymmFunction(-m), 3);
+        prob.addMatrixOperator(opAddExtra, _phi, _mu);
+    };
+
     ///SECOND EQUATION
     /**\f(
      * (\mu^m, \varphi_2)-\sigma \varepsilon(\nabla \phi^m,\nabla \varphi_2)- \varepsilon^{-1}(W'(\phi^m),\varphi_2) &=0
@@ -125,6 +140,12 @@ int main(int argc, char** argv)
     prob.addMatrixOperator(zot(1.0), _mu, _mu);
     ///Laplace phi
     prob.addMatrixOperator(sot(-eps), _mu, _phi);
+
+    if (axisymmetric)
+    {
+        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, axisymmFunction(eps), 3);
+        prob.addMatrixOperator(opAddExtra, _mu, _phi);
+    };
 
     ///double Well potential: phi^2(1-phi)^2
     auto opFimpl = zot(-1./eps * (2. + 12*phi*(phi - 1.)));
@@ -166,6 +187,17 @@ int main(int argc, char** argv)
     //Stokes Operator
     auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
     prob.addMatrixOperator(opStokes, _1, _1);
+
+    if(axisymmetric){
+
+        auto opExtraX = makeOperator(tag::test_partialtrial{0}, viscosity*axisymmFunction(-1.), 5);
+        auto opExtraY = makeOperator(tag::test_partialtrial{1}, viscosity*axisymmFunction(-1.), 5);
+        auto opExtraGrad = makeOperator(tag::testvec_gradtrial{}, viscosity*axisymmFunction(-1.), 5);
+
+        prob.addMatrixOperator(opExtraX, makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
+        prob.addMatrixOperator(opExtraY, makeTreePath(_1, _0, 1), makeTreePath(_1, _0, 0));
+        prob.addMatrixOperator(opExtraGrad, _v, makeTreePath(_1, _0, 0));
+    };
 
 if (true) {
     // define a constant fluid density
@@ -222,6 +254,7 @@ if (true) {
     auto normal_vec = gradPhi/absGradPhi;
     auto Id=1.;
     auto NxN =outer(normal_vec,normal_vec);
+    auto gradC = gradientOf(c);
 
     //time derivative
     prob.addMatrixOperator(zot(invTau*absGradPhi, 5), _c, _c);
@@ -237,9 +270,19 @@ if (true) {
     auto opConcLaplacian2 = makeOperator(tag::gradtest_gradtrial {}, - absGradPhi * NxN,5);
     prob.addMatrixOperator(opConcLaplacian2, _c, _c);
 
+    if(axisymmetric){
+        auto PGradC_r = (FieldVector<double, 2>{1.,0.}-FieldVector<double, 2>{1.,0.}*NxN)*gradC;
+        prob.addMatrixOperator(zot(PGradC_r*axisymmFunction(1.), 5),_c, _c);
+    }
+
     //Convection term with Projection operator
     prob.addMatrixOperator(zot(absGradPhi* divergenceOf(v), 5), _c, _c);
     prob.addMatrixOperator(zot(-absGradPhi*normal_vec *gradientOf(v)*normal_vec, 5), _c, _c);
+
+    if(axisymmetric){
+        auto v_r = prob.solution(makeTreePath(_1, _0, 1));
+        prob.addMatrixOperator(zot(v_r*axisymmFunction(1.), 5),_c, _c);
+    }
 
     /*
     //Linear term
@@ -264,7 +307,6 @@ if (true) {
     //auto gradf = gradientOf(constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c))));
     auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constant1*(2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*gradPhi, 5);
     prob.addMatrixOperator(opCoupC, _v, _mu);
-    auto gradC = gradientOf(c);
     //Switched sign????
     auto opCoupC1 = makeOperator(tag::testvec_trial {}, absGradPhi*(-constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC), 5);
     auto opCoupC2 = makeOperator(tag::testvec_trial {}, absGradPhi*(constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC*NxN), 5);
