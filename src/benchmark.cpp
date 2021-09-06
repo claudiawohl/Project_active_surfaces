@@ -30,9 +30,6 @@ using Grid = Dune::AlbertaGrid<GRIDDIM, WORLDDIM>;
 auto _0 = Dune::Indices::_0;
 auto _1 = Dune::Indices::_1;
 
-auto axisymmFunction = [](auto constant, double centre){
-    return [constant, centre](auto const& x) {return constant/(x[0]-centre);};
-};
 
 int main(int argc, char** argv)
 {
@@ -62,9 +59,6 @@ int main(int argc, char** argv)
     auto v = prob.solution(_1,_0);
 
     bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
-
-    double centre = 0.;
-    if (axisymmetric) {centre = 0.;};
 
     auto upper_bound = [](auto const& x){
         return Dune::FieldVector<double,1>{1.};
@@ -103,7 +97,7 @@ int main(int argc, char** argv)
 
     if (axisymmetric)
     {
-        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, axisymmFunction(-m, centre), 3);
+        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, -m/X(0), 5);
         prob.addMatrixOperator(opAddExtra, _phi, _mu);
     };
 
@@ -119,7 +113,7 @@ int main(int argc, char** argv)
 
     if (axisymmetric)
     {
-        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, axisymmFunction(a*eps, centre), 3);
+        auto opAddExtra = makeOperator(tag::test_partialtrial{0}, a*eps/X(0), 5);
         prob.addMatrixOperator(opAddExtra, _mu, _phi);
     };
 
@@ -160,22 +154,24 @@ int main(int argc, char** argv)
     auto viscosity = inner_visc*phiProjected+outer_visc*(1.-phiProjected);
 
     //Stokes Operator
+    // sum_i <grad(u_i),grad(v_i)> + <p, div(v)> + <div(u), q>
     auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
     prob.addMatrixOperator(opStokes, _1, _1);
 
     if(axisymmetric){
-
-        auto extra3D = [centre](auto const& x){
-            return -1./(x[0]-centre);
-        };
-
-      auto opExtraX = makeOperator(tag::test_partialtrial{0}, viscosity*extra3D, 5);
-      auto opExtraY = makeOperator(tag::test_partialtrial{1}, viscosity*extra3D, 5);
-      auto opExtraGrad = makeOperator(tag::testvec_gradtrial{}, viscosity*extra3D, 5);
+      auto opExtraX = makeOperator(tag::test_partialtrial{0}, -viscosity/X(0), 5);
+      auto opExtraY = makeOperator(tag::test_partialtrial{1}, -viscosity/X(0), 5);
 
       prob.addMatrixOperator(opExtraX, makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
+      prob.addMatrixOperator(opExtraX, makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
       prob.addMatrixOperator(opExtraY, makeTreePath(_1, _0, 1), makeTreePath(_1, _0, 0));
-      prob.addMatrixOperator(opExtraGrad, _v, makeTreePath(_1, _0, 0));
+      prob.addMatrixOperator(opExtraX, makeTreePath(_1, _0, 1), makeTreePath(_1, _0, 1));
+
+      auto laplaceVAxi2 = makeOperator(tag::test_trial{},  2*viscosity/ (X(0) * X(0)), 5);
+      prob.addMatrixOperator(laplaceVAxi2,makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
+
+      auto opExtra = makeOperator(tag::test_trial{}, 1./X(0), 5);
+      prob.addMatrixOperator(opExtra, makeTreePath(_1, _1), makeTreePath(_1, _0, 0));
     };
 
     auto opCoup = makeOperator(tag::testvec_trial{}, -sigma*gradPhi);
@@ -215,7 +211,7 @@ int main(int argc, char** argv)
     double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
 
     double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
-    if (axisymmetric) {centerx = centre;};
+    if (axisymmetric) {centerx = 0.;};
     double centery = Parameters::get<double>("parameters->centery").value_or(0.);
 
     for (int i = 0; i < 10; ++i) {
@@ -230,7 +226,7 @@ int main(int argc, char** argv)
     //boundary condition
     prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
     prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
-    //prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 && x[1]<1.e-8);}, makeTreePath(_1,_1), makeTreePath(_1,_1), 0.); //set boundary for pressure - ensures regularity
+    prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8);}, makeTreePath(_1,_1), makeTreePath(_1,_1), 0.); //set boundary for pressure - ensures regularity
 
     AdaptInstationary adapt("adapt", prob, adaptInfo, probInstat, adaptInfo);
     adapt.adapt();
