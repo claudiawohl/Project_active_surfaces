@@ -6,10 +6,10 @@ chMesh->global refinements: 3
 parameters->radius:  0.25
 parameters->radius1: 0.3
 parameters->radius2: 0.5
-parameters->epsilon: 0.01
+parameters->epsilon: 0.02
 parameters->centerx: 0.5
 parameters->centery: 0.5
-parameters->mobility: 0.001
+parameters->mobility: 0.01
 parameters->a: 1.0
 parameters->b: 1.0
 parameters->sigma: 24.5
@@ -53,4 +53,4 @@ ch->output[1,1]->animation:          1
 
 adapt->timestep:    0.01
 adapt->start time:  0.0
-adapt->end time:    3.
+adapt->end time:    3.5
