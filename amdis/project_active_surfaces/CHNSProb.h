@@ -4,6 +4,8 @@
 #include <amdis/Marker.hpp>
 #include "amdis/extensions/BaseProblem.hpp"
 
+#include <amdis/AdaptInstationary.hpp>
+
 using namespace AMDiS;
 
 /// introduce index short cuts
@@ -24,24 +26,31 @@ struct CHNSProb: BaseProblem<Traits>
     : BaseProblem<Traits>(name, grid, bf) {}
 
     public:
-        bool axisymmetric = false;
+        bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
+        double m = Parameters::get<double>("parameters->mobility").value_or(0.4);
+        double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.;
+        double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
+
+        //double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
+        //double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
+        //double centery = Parameters::get<double>("parameters->centery").value_or(0.);
 
     public:
 
         /** \description The first to equations are part of the Cahn-Hilliard model
-                                              \f(  \begin{cases}
-                                               \partial_t \phi + v \cdot \nabla \phi \hspace{1.2cm} &= \nabla \cdot (M\nabla \mu)\\
-                                               \mu &= \sigma \left(\varepsilon^{-1} W'(\phi)+\varepsilon\Delta \phi \right)
-                                              \end{cases} \f).
+              \f(  \begin{cases}
+               \partial_t \phi + v \cdot \nabla \phi \hspace{1.2cm} &= \nabla \cdot (M\nabla \mu)\\
+               \mu &= \sigma \left(\varepsilon^{-1} W'(\phi)+\varepsilon\Delta \phi \right)
+              \end{cases} \f).
 
-                                              \$ \phi \in [0,1]\$... phase field
-                                              \$ \mu \$... chemical potential
-                                              \$ W = \phi^2(1-\phi)^2\$... Double Well Potential
-                                              \$ \varepsilon \$ transition width
-                                              \$ \sigma = \tilde \sigma + f(c)\$... surface tension
+              \$ \phi \in [0,1]\$... phase field
+              \$ \mu \$... chemical potential
+              \$ W = \phi^2(1-\phi)^2\$... Double Well Potential
+              \$ \varepsilon \$ transition width
+              \$ \sigma = \tilde \sigma + f(c)\$... surface tension
 
-                                             We implement them in their weak formultation.
-                                            **/
+             We implement them in their weak formultation.
+            **/
         void fillCahnHilliard(AdaptInfo& adaptInfo) {
             /// FUNCTIONS from the previous time step
             auto invTau = std::ref(this->invTau());
@@ -49,10 +58,6 @@ struct CHNSProb: BaseProblem<Traits>
             auto gradPhi = gradientOf(phi);
             auto v = this->problem().solution(_v);
             auto phiProjected = max(min(evalAtQP(phi),Dune::FieldVector<double,1>{1.}), Dune::FieldVector<double, 1>{0.});
-
-            auto test_para = 1.;
-
-            this->problem().addMatrixOperator(zot(2*test_para), _phi, _phi);
             
             /// FIRST EQUATION
             /**\f(
@@ -61,20 +66,14 @@ struct CHNSProb: BaseProblem<Traits>
 
 
             ///time derivative
-            this->problem().addMatrixOperator(zot(invTau), _phi, _phi); //TODO: public class member.
+            this->problem().addMatrixOperator(zot(invTau), _phi, _phi);
             this->problem().addVectorOperator(zot(phi * invTau), _phi);
-
-            //Coupling term - convection term
-            //auto opFconv = makeOperator(tag::test_gradtrial{}, FieldVector<double, 2>{0, 0.98}); //Test
-            //problem().addMatrixOperator(opFconv, _phi, _phi);                                         //Test
 
             ///convection term (coupling)
             auto opFconv = makeOperator(tag::test_trialvec{}, gradPhi, 5);
             this->problem().addMatrixOperator(opFconv, _phi, _v);
 
             ///mobility term
-            double m = Parameters::get<double>("parameters->mobility").value_or(0.4); //TODO derive in main()
-            //problem().addMatrixOperator(sot(m*pow<2>(phi)*pow<2>(FieldVector<double,1>{1.}-phi)), _phi, _mu);
             this->problem().addMatrixOperator(sot(m), _phi, _mu);
 
             if (axisymmetric)
@@ -88,9 +87,6 @@ struct CHNSProb: BaseProblem<Traits>
              * (\mu^m, \varphi_2)-\sigma \varepsilon(\nabla \phi^m,\nabla \varphi_2)- \varepsilon^{-1}(W'(\phi^m),\varphi_2) &=0
              * \f)
              */
-
-            double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.; //TODO: derive in main()
-            double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02); //TODO: derive in main()
 
             ///mu
             this->problem().addMatrixOperator(zot(1.0), _mu, _mu);
@@ -135,13 +131,6 @@ struct CHNSProb: BaseProblem<Traits>
             auto v = this->problem().solution(_v);
             auto phiProjected = max(min(evalAtQP(phi),Dune::FieldVector<double,1>{1.}), Dune::FieldVector<double, 1>{0.});
 
-            double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.; //TODO: derive in main()
-
-            for (int i=0; i < WORLDDIM; i++){
-               // this->problem().addMatrixOperator(zot(1.), makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
-            }
-            //this->problem().addMatrixOperator(zot(1.), _p, _p);
-
             ///THIRD EQUATION
             /**
              \begin{cases}
@@ -150,74 +139,74 @@ struct CHNSProb: BaseProblem<Traits>
              \end{cases}
              **/
 
-                        ///Stokes equation
-                        // define  a fluid viscosity
-                        double outer_visc = Parameters::get<double>("parameters->outerviscosity").value_or(10.);
-                        double inner_visc = Parameters::get<double>("parameters->innerviscosity").value_or(1.);
+            ///Stokes equation
+            // define  a fluid viscosity
+            double outer_visc = Parameters::get<double>("parameters->outerviscosity").value_or(10.);
+            double inner_visc = Parameters::get<double>("parameters->innerviscosity").value_or(1.);
 
-                        auto viscosity = inner_visc*phiProjected+outer_visc*(1.-phiProjected);
+            auto viscosity = inner_visc*phiProjected+outer_visc*(1.-phiProjected);
 
-                        //Stokes Operator
-                        auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
-                        this->problem().addMatrixOperator(opStokes, _1, _1);
+            //Stokes Operator
+            auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
+            this->problem().addMatrixOperator(opStokes, _1, _1);
 
-                        if(axisymmetric){
-                            auto opExtraX = makeOperator(tag::test_partialtrial{0}, -viscosity/X(0), 5);
-                            auto opExtraY = makeOperator(tag::test_partialtrial{1}, -viscosity/X(0), 5);
+            if(axisymmetric){
+                auto opExtraX = makeOperator(tag::test_partialtrial{0}, -viscosity/X(0), 5);
+                auto opExtraY = makeOperator(tag::test_partialtrial{1}, -viscosity/X(0), 5);
 
-                            this->problem().addMatrixOperator(opExtraX, makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
-                            this->problem().addMatrixOperator(opExtraX, makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
-                            this->problem().addMatrixOperator(opExtraY, makeTreePath(_1, _0, 1), makeTreePath(_1, _0, 0));
-                            this->problem().addMatrixOperator(opExtraX, makeTreePath(_1, _0, 1), makeTreePath(_1, _0, 1));
+                this->problem().addMatrixOperator(opExtraX, makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
+                this->problem().addMatrixOperator(opExtraX, makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
+                this->problem().addMatrixOperator(opExtraY, makeTreePath(_1, _0, 1), makeTreePath(_1, _0, 0));
+                this->problem().addMatrixOperator(opExtraX, makeTreePath(_1, _0, 1), makeTreePath(_1, _0, 1));
 
-                            auto laplaceVAxi2 = makeOperator(tag::test_trial{},  2*viscosity/ (X(0) * X(0)), 5);
-                            this->problem().addMatrixOperator(laplaceVAxi2,makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
+                auto laplaceVAxi2 = makeOperator(tag::test_trial{},  2*viscosity/ (X(0) * X(0)), 5);
+                this->problem().addMatrixOperator(laplaceVAxi2,makeTreePath(_1, _0, 0), makeTreePath(_1, _0, 0));
 
-                            auto opExtra = makeOperator(tag::test_trial{}, 1./X(0), 5);
-                            this->problem().addMatrixOperator(opExtra, makeTreePath(_1, _1), makeTreePath(_1, _0, 0));
-                        };
+                auto opExtra = makeOperator(tag::test_trial{}, 1./X(0), 5);
+                this->problem().addMatrixOperator(opExtra, makeTreePath(_1, _1), makeTreePath(_1, _0, 0));
+            };
 
-                        if (false) {
-                            // define a constant fluid density
-                            double density_inner = Parameters::get<double>("parameters->innerdensity").value_or(100.);
-                            double density_outer = Parameters::get<double>("parameters->outerdensity").value_or(1000.);
-                            auto density = density_inner * phiProjected + (1. - phiProjected) * density_outer;
+            if (true) {
+                // define a constant fluid density
+                double density_inner = Parameters::get<double>("parameters->innerdensity").value_or(100.);
+                double density_outer = Parameters::get<double>("parameters->outerdensity").value_or(1000.);
+                auto density = density_inner * phiProjected + (1. - phiProjected) * density_outer;
 
-                            ///time derivative
-                            // <1/tau * u, v>
-                            auto opTime = makeOperator(tag::testvec_trialvec{},
-                                                       density * invTau, 5);
-                            this->problem().addMatrixOperator(opTime, _v, _v);
+                ///time derivative
+                // <1/tau * u, v>
+                auto opTime = makeOperator(tag::testvec_trialvec{},
+                                           density * invTau, 5);
+                this->problem().addMatrixOperator(opTime, _v, _v);
 
-                            // <1/tau * u^old, v>
-                            auto opTimeOld = makeOperator(tag::testvec{},
-                                                          density * invTau * this->problem().solution(_v), 5);
-                            this->problem().addVectorOperator(opTimeOld, _v);
+                // <1/tau * u^old, v>
+                auto opTimeOld = makeOperator(tag::testvec{},
+                                              density * invTau * this->problem().solution(_v), 5);
+                this->problem().addVectorOperator(opTimeOld, _v);
 
-                            ///material derivative part
-                            for (int i = 0; i < WORLDDIM; ++i) {
-                                // <(u^old * nabla)u_i, v_i>
-                                auto opNonlin = makeOperator(tag::test_gradtrial{},
-                                                             density * this->problem().solution(_v), 5);
-                                this->problem().addMatrixOperator(opNonlin, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
-                            }
+                ///material derivative part
+                for (int i = 0; i < WORLDDIM; ++i) {
+                    // <(u^old * nabla)u_i, v_i>
+                    auto opNonlin = makeOperator(tag::test_gradtrial{},
+                                                 density * this->problem().solution(_v), 5);
+                    this->problem().addMatrixOperator(opNonlin, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
+                }
 
-                            ///extern force (gravitational force)
-                            auto extForce = [](auto const& x) { return FieldVector<double,  WORLDDIM>{0.0, - 0.98};};
-                            auto opForce = makeOperator(tag::testvec {}, density*extForce, 5);
-                            this->problem().addVectorOperator(opForce, _v);
+                ///extern force (gravitational force)
+                auto extForce = [](auto const& x) { return FieldVector<double,  WORLDDIM>{0.0, - 0.98};};
+                auto opForce = makeOperator(tag::testvec {}, density*extForce, 5);
+                this->problem().addVectorOperator(opForce, _v);
 
-                        }
+            }
 
-                        ///coupling term
-                        auto opCoup = makeOperator(tag::testvec_trial{}, -sigma*gradPhi);
-                        this->problem().addMatrixOperator(opCoup, _v, _mu);
-                        /*
-                            for (int i=0; i<WORLDDIM; i++){
-                                auto partphi = partialDerivativeOf(phi,i);
-                                this->problem().addMatrixOperator(zot(-sigma*partphi), makeTreePath(_1,_0, i), _mu);
-                            }
-                        */
+            ///coupling term
+            auto opCoup = makeOperator(tag::testvec_trial{}, -sigma*gradPhi);
+            this->problem().addMatrixOperator(opCoup, _v, _mu);
+            /*
+                for (int i=0; i<WORLDDIM; i++){
+                    auto partphi = partialDerivativeOf(phi,i);
+                    this->problem().addMatrixOperator(zot(-sigma*partphi), makeTreePath(_1,_0, i), _mu);
+                }
+            */
 
             return; 
         }
@@ -230,6 +219,7 @@ struct CHNSProb: BaseProblem<Traits>
         void fillBoundaryConditions(AdaptInfo& adaptInfo) override {
             this->problem().addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
             this->problem().addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
+            this->problem().addDirichletBC([](auto const& x) {return (x[1]<1.e-8 );}, makeTreePath(_1,_1), makeTreePath(_1,_1), 0.);
         }
 
         void initData(AdaptInfo& adaptInfo) override{
@@ -251,13 +241,14 @@ struct CHNSProb: BaseProblem<Traits>
             /// FUNCTIONS from the previous time step
             auto phi = this->problem().solution(_phi);
 
-            //set initial value for Benchmark
-            double eps = 0.02; //TODO: use class member(s)
-            double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
+            //TODO: Only define them as member function
+            double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
 
+            double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
             double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
             double centery = Parameters::get<double>("parameters->centery").value_or(0.);
 
+            //set initial value for Benchmark
             for (int i = 0; i < 10; ++i) {
                 phi << [eps, radius, centerx, centery](auto const& x) {
                     using Math::sqr;

@@ -6,10 +6,10 @@ chMesh->global refinements: 3
 parameters->radius:  0.25
 parameters->radius1: 0.3
 parameters->radius2: 0.5
-parameters->epsilon: 0.02
+parameters->epsilon: 0.01
 parameters->centerx: 0.5
 parameters->centery: 0.5
-parameters->mobility: 0.01
+parameters->mobility: 0.0001
 parameters->a: 1.0
 parameters->b: 1.0
 parameters->sigma: 24.5
@@ -17,39 +17,39 @@ parameters->sigma: 24.5
 refinement->interface: 10
 refinement->bulk: 2
 
-ch->mesh:                       chMesh
-ch->solver:                     direct
-ch->solver->max iteration:      1000
-ch->solver->relative tolerance: 1e-6
-ch->solver->info: 1
+chns->space->mesh:                       chMesh
+chns->space->solver:                     direct
+chns->space->solver->max iteration:      1000
+chns->space->solver->relative tolerance: 1e-6
+chns->space->solver->info: 1
 
-ch->output[0,0]->format:             vtk
-ch->output[0,0]->filename:           phi.2d
-ch->output[0,0]->output directory:   output_sandbox
-ch->output[0,0]->name:               phi
-ch->output[0,0]->mode:               1
-ch->output[0,0]->animation:          1
+chns->space->output[0,0]->format:             vtk
+chns->space->output[0,0]->filename:           phi.2d
+chns->space->output[0,0]->output directory:   output_sandbox
+chns->space->output[0,0]->name:               phi
+chns->space->output[0,0]->mode:               1
+chns->space->output[0,0]->animation:          1
 
-ch->output[0,1]->format:             vtk
-ch->output[0,1]->filename:           mu.2d
-ch->output[0,1]->output directory:   output_sandbox
-ch->output[0,1]->name:               mu
-ch->output[0,1]->mode:               1
-ch->output[0,1]->animation:          1
+chns->space->output[0,1]->format:             vtk
+chns->space->output[0,1]->filename:           mu.2d
+chns->space->output[0,1]->output directory:   output_sandbox
+chns->space->output[0,1]->name:               mu
+chns->space->output[0,1]->mode:               1
+chns->space->output[0,1]->animation:          1
 
-ch->output[1,0]->format:             vtk
-ch->output[1,0]->filename:           v.2d
-ch->output[1,0]->output directory:   output_sandbox
-ch->output[1,0]->name:               v
-ch->output[1,0]->mode:               1
-ch->output[1,0]->animation:          1
+chns->space->output[1,0]->format:             vtk
+chns->space->output[1,0]->filename:           v.2d
+chns->space->output[1,0]->output directory:   output_sandbox
+chns->space->output[1,0]->name:               v
+chns->space->output[1,0]->mode:               1
+chns->space->output[1,0]->animation:          1
 
-ch->output[1,1]->format:             vtk
-ch->output[1,1]->filename:           p.2d
-ch->output[1,1]->output directory:   output_sandbox
-ch->output[1,1]->name:               p
-ch->output[1,1]->mode:               1
-ch->output[1,1]->animation:          1
+chns->space->output[1,1]->format:             vtk
+chns->space->output[1,1]->filename:           p.2d
+chns->space->output[1,1]->output directory:   output_sandbox
+chns->space->output[1,1]->name:               p
+chns->space->output[1,1]->mode:               1
+chns->space->output[1,1]->animation:          1
 
 adapt->timestep:    0.01
 adapt->start time:  0.0

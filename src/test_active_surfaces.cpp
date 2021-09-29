@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     auto chnsBasis = composite(chBasis, stokesBasis);
 
     //CHNSProblem prob("CHNS", *grid, chnsBasis); //TODO: Figure out arguments
-    CHNSProb prob("CHNS", *grid, chnsBasis);
+    CHNSProb prob("chns", *grid, chnsBasis);
     prob.initialize(INIT_ALL);
 
     AdaptInfo adaptInfo("adapt");
