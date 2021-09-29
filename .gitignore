@@ -1,5 +1,6 @@
 /output/
 /output_sandbox/
+/output_benchmark/
 /build-cmake/
 /cmake-build-default/
 /html/
