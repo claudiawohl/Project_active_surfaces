@@ -8,16 +8,6 @@
 
 using namespace AMDiS;
 
-/// introduce index short cuts
-auto _0= Dune::Indices::_0;
-auto _1 = Dune::Indices::_1;
-
-/// define path shortcuts
-auto _phi = makeTreePath(_0,0);
-auto _mu = makeTreePath(_0,1);
-auto _v = makeTreePath(_1,_0);
-auto _p = makeTreePath(_1,_1);
-
 template <class Traits>
 struct CHNSProb: BaseProblem<Traits>
     {
@@ -26,6 +16,17 @@ struct CHNSProb: BaseProblem<Traits>
     : BaseProblem<Traits>(name, grid, bf) {}
 
     public:
+
+        /// introduce index short cuts
+        static constexpr auto _0= Dune::Indices::_0;
+        static constexpr auto _1 = Dune::Indices::_1;
+
+        /// define path shortcuts
+        Dune::TypeTree::HybridTreePath<std::integral_constant<unsigned long, 0>, unsigned long> _phi = makeTreePath(_0,0);
+        Dune::TypeTree::HybridTreePath<std::integral_constant<unsigned long, 0>, unsigned long> _mu = makeTreePath(_0,1);
+        Dune::TypeTree::HybridTreePath<std::integral_constant<unsigned long, 1>, std::integral_constant<unsigned long, 0> > _v = makeTreePath(_1,_0);
+        Dune::TypeTree::HybridTreePath<std::integral_constant<unsigned long, 1>, std::integral_constant<unsigned long, 1> > _p = makeTreePath(_1,_1);
+
         bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
         double m = Parameters::get<double>("parameters->mobility").value_or(0.4);
         double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.;
@@ -34,6 +35,7 @@ struct CHNSProb: BaseProblem<Traits>
         //double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
         //double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
         //double centery = Parameters::get<double>("parameters->centery").value_or(0.);
+
 
     public:
 
@@ -53,6 +55,7 @@ struct CHNSProb: BaseProblem<Traits>
             **/
         void fillCahnHilliard(AdaptInfo& adaptInfo) {
             /// FUNCTIONS from the previous time step
+            //TODO: Have them as class member
             auto invTau = std::ref(this->invTau());
             auto phi = this->problem().solution(_phi);
             auto gradPhi = gradientOf(phi);

@@ -25,3 +25,10 @@ add_amdis_executable(
         DIM 2
         DOW 2
         ALBERTA_GRID)
+
+add_amdis_executable(
+        NAME "BenchmarkClass"
+        SOURCES benchmark_cls.cpp
+        DIM 2
+        DOW 2
+        ALBERTA_GRID)
