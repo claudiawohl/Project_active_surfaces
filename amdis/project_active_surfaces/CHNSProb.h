@@ -36,6 +36,12 @@ struct CHNSProb: BaseProblem<Traits>
         //double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
         //double centery = Parameters::get<double>("parameters->centery").value_or(0.);
 
+        /// FUNCTIONS from the previous time step
+        auto phi()    {return this->problem().solution(_phi);}
+        auto v() {return this->problem().solution(_v);}
+        auto phiProjected() {return max(min(evalAtQP(phi()),Dune::FieldVector<double,1>{1.}), Dune::FieldVector<double, 1>{0.});}
+
+        //TODO: invTau, gradPhi, phi in initData(), solveInitialProblem()
 
     public:
 
@@ -54,13 +60,7 @@ struct CHNSProb: BaseProblem<Traits>
              We implement them in their weak formultation.
             **/
         void fillCahnHilliard(AdaptInfo& adaptInfo) {
-            /// FUNCTIONS from the previous time step
-            //TODO: Have them as class member
             auto invTau = std::ref(this->invTau());
-            auto phi = this->problem().solution(_phi);
-            auto gradPhi = gradientOf(phi);
-            auto v = this->problem().solution(_v);
-            auto phiProjected = max(min(evalAtQP(phi),Dune::FieldVector<double,1>{1.}), Dune::FieldVector<double, 1>{0.});
             
             /// FIRST EQUATION
             /**\f(
@@ -70,10 +70,10 @@ struct CHNSProb: BaseProblem<Traits>
 
             ///time derivative
             this->problem().addMatrixOperator(zot(invTau), _phi, _phi);
-            this->problem().addVectorOperator(zot(phi * invTau), _phi);
+            this->problem().addVectorOperator(zot(phi() * invTau), _phi);
 
             ///convection term (coupling)
-            auto opFconv = makeOperator(tag::test_trialvec{}, gradPhi, 5);
+            auto opFconv = makeOperator(tag::test_trialvec{}, gradientOf(phi()), 5);
             this->problem().addMatrixOperator(opFconv, _phi, _v);
 
             ///mobility term
@@ -103,9 +103,9 @@ struct CHNSProb: BaseProblem<Traits>
             };
 
             ///double Well potential: phi^2(1-phi)^2
-            auto opFimpl = zot(-1./eps * (2. + 12*phi*(phi - 1.)));
+            auto opFimpl = zot(-1./eps * (2. + 12*phi()*(phi() - 1.)));
             this->problem().addMatrixOperator(opFimpl, _mu, _phi);
-            auto opFexpl = zot(1./eps * pow<2>(phi)*(6. - 8*phi));
+            auto opFexpl = zot(1./eps * pow<2>(phi())*(6. - 8*phi()));
             this->problem().addVectorOperator(opFexpl, _mu);
 
             return;
@@ -127,12 +127,7 @@ struct CHNSProb: BaseProblem<Traits>
         * We implement them in their weak formulation.
         */
         void fillNavierStokes(AdaptInfo& adaptInfo) {
-            /// FUNCTIONS from the previous time step
             auto invTau = std::ref(this->invTau());
-            auto phi = this->problem().solution(_phi);
-            auto gradPhi = gradientOf(phi);
-            auto v = this->problem().solution(_v);
-            auto phiProjected = max(min(evalAtQP(phi),Dune::FieldVector<double,1>{1.}), Dune::FieldVector<double, 1>{0.});
 
             ///THIRD EQUATION
             /**
@@ -147,7 +142,7 @@ struct CHNSProb: BaseProblem<Traits>
             double outer_visc = Parameters::get<double>("parameters->outerviscosity").value_or(10.);
             double inner_visc = Parameters::get<double>("parameters->innerviscosity").value_or(1.);
 
-            auto viscosity = inner_visc*phiProjected+outer_visc*(1.-phiProjected);
+            auto viscosity = inner_visc*phiProjected()+outer_visc*(1.-phiProjected());
 
             //Stokes Operator
             auto opStokes = makeOperator(tag::stokes{}, viscosity, 5);
@@ -173,7 +168,7 @@ struct CHNSProb: BaseProblem<Traits>
                 // define a constant fluid density
                 double density_inner = Parameters::get<double>("parameters->innerdensity").value_or(100.);
                 double density_outer = Parameters::get<double>("parameters->outerdensity").value_or(1000.);
-                auto density = density_inner * phiProjected + (1. - phiProjected) * density_outer;
+                auto density = density_inner * phiProjected() + (1. - phiProjected()) * density_outer;
 
                 ///time derivative
                 // <1/tau * u, v>
@@ -183,14 +178,14 @@ struct CHNSProb: BaseProblem<Traits>
 
                 // <1/tau * u^old, v>
                 auto opTimeOld = makeOperator(tag::testvec{},
-                                              density * invTau * this->problem().solution(_v), 5);
+                                              density * invTau * v(), 5);
                 this->problem().addVectorOperator(opTimeOld, _v);
 
                 ///material derivative part
                 for (int i = 0; i < WORLDDIM; ++i) {
                     // <(u^old * nabla)u_i, v_i>
                     auto opNonlin = makeOperator(tag::test_gradtrial{},
-                                                 density * this->problem().solution(_v), 5);
+                                                 density * v(), 5);
                     this->problem().addMatrixOperator(opNonlin, makeTreePath(_1, _0, i), makeTreePath(_1, _0, i));
                 }
 
@@ -202,7 +197,7 @@ struct CHNSProb: BaseProblem<Traits>
             }
 
             ///coupling term
-            auto opCoup = makeOperator(tag::testvec_trial{}, -sigma*gradPhi);
+            auto opCoup = makeOperator(tag::testvec_trial{}, -sigma* gradientOf(phi()));
             this->problem().addMatrixOperator(opCoup, _v, _mu);
             /*
                 for (int i=0; i<WORLDDIM; i++){
