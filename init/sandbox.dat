@@ -51,6 +51,13 @@ chns->space->output[1,1]->name:               p
 chns->space->output[1,1]->mode:               1
 chns->space->output[1,1]->animation:          1
 
+chns->space->output[2]->format:             vtk
+chns->space->output[2]->filename:           c.2d
+chns->space->output[2]->output directory:   output_sandbox
+chns->space->output[2]->name:               c
+chns->space->output[2]->mode:               1
+chns->space->output[2]->animation:          1
+
 adapt->timestep:    0.01
 adapt->start time:  0.0
 adapt->end time:    3.5

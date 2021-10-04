@@ -28,17 +28,17 @@ struct CHNSProb: BaseProblem<Traits>
         Dune::TypeTree::HybridTreePath<std::integral_constant<unsigned long, 1>, std::integral_constant<unsigned long, 1> > _p = makeTreePath(_1,_1);
 
         bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
-        double m = Parameters::get<double>("parameters->mobility").value_or(0.4);
-        double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.;
-        double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
+        const double m = Parameters::get<double>("parameters->mobility").value_or(0.4);
+        const double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.;
+        const double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
 
         //double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
         //double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
         //double centery = Parameters::get<double>("parameters->centery").value_or(0.);
 
         /// FUNCTIONS from the previous time step
-        auto phi()    {return this->problem().solution(_phi);}
-        auto v() {return this->problem().solution(_v);}
+        auto phi()    {return this->solution(_phi);}
+        auto v() {return this->solution(_v);}
         auto phiProjected() {return max(min(evalAtQP(phi()),Dune::FieldVector<double,1>{1.}), Dune::FieldVector<double, 1>{0.});}
 
         //TODO: invTau, gradPhi, phi in initData(), solveInitialProblem()
@@ -236,12 +236,12 @@ struct CHNSProb: BaseProblem<Traits>
         }
 
         void solveInitialProblem(AdaptInfo& adaptInfo) override{
+
+            //TODO: Only define them as member function
             /// FUNCTIONS from the previous time step
             auto phi = this->problem().solution(_phi);
 
-            //TODO: Only define them as member function
             double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
-
             double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
             double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
             double centery = Parameters::get<double>("parameters->centery").value_or(0.);
