@@ -40,18 +40,57 @@ int main(int argc, char** argv)
     auto chnsBasis = composite(chBasis, stokesBasis);
 
     CHNSProb probCHNS("chns", grid, chnsBasis);
+    probCHNS.initialize(INIT_ALL);
 
     //Lagrange-Basis fixed!
     ConcProb concProb("conc", grid, probCHNS.phi());
+    concProb.initialize(INIT_ALL);
 
-    CouplingBaseProblem prob{"prob", probCHNS, concProb};
-    prob.initialize(INIT_ALL);
+    //TODO: Add coupling terms
+
+
+    //TODO: Do INIT_ALL here and fix segmentation fault
+    //CouplingBaseProblem prob{"prob", probCHNS, concProb};
+    //prob.initialize(INIT_ALL);
 
     AdaptInfo adaptInfo("adapt");
-    prob.initBaseProblem(adaptInfo);
+    probCHNS.initBaseProblem(adaptInfo);
+    probCHNS.initTimeInterface();
+    concProb.initBaseProblem(adaptInfo);
+    concProb.initTimeInterface();
 
-    AdaptInstationary adaptInst("adapt", prob, adaptInfo, prob, adaptInfo);
-    adaptInst.adapt();
+    while (!(adaptInfo.reachedEndTime())) {
+        adaptInfo.setTimestepIteration(0);
+        adaptInfo.incTimestepNumber();
+        adaptInfo.setTime(adaptInfo.time() + adaptInfo.timestep());
+
+        if (adaptInfo.timestepNumber() == 0) {
+            adaptInfo.setTime(adaptInfo.startTime());
+            probCHNS.setTime(adaptInfo);
+            probCHNS.solveInitialProblem(adaptInfo); // maybe initialAdaptInfo
+            probCHNS.transferInitialSolution(adaptInfo);
+
+            concProb.setTime(adaptInfo);
+            concProb.solveInitialProblem(adaptInfo); // maybe initialAdaptInfo
+            concProb.transferInitialSolution(adaptInfo);
+        }
+
+        std::cout << "time = " << adaptInfo.time() << ", end time = " << adaptInfo.endTime() << ", timestep = "
+        << adaptInfo.timestep() << "\n";
+
+        probCHNS.initTimestep(adaptInfo);
+        probCHNS.beginIteration(adaptInfo);
+        probCHNS.oneIteration(adaptInfo, FULL_ITERATION);
+        probCHNS.endIteration(adaptInfo);
+        probCHNS.closeTimestep(adaptInfo);
+
+        concProb.initTimestep(adaptInfo);
+        concProb.beginIteration(adaptInfo);
+        concProb.oneIteration(adaptInfo, FULL_ITERATION);
+        concProb.endIteration(adaptInfo);
+        concProb.closeTimestep(adaptInfo);
+    }
+
 
     return 0;
 }
