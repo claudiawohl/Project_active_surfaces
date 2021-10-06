@@ -6,5 +6,5 @@ Module: project_active_surfaces
 Version: 1
 Maintainer: claudia-ella.wohlgemuth@math.tu-freiberg.de
 
-Depends: amdis dune-common dune-geometry dune-localfunctions dune-typetree dune-uggrid dune-grid dune-istl dune-functions dune-alugrid dune-foamgrid
+Depends: amdis dune-common dune-geometry dune-localfunctions dune-typetree dune-uggrid dune-grid dune-istl dune-functions amdis-extensions
 # Suggests: add additional optional dune modules here

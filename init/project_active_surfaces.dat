@@ -9,7 +9,7 @@ parameters->radius2: 0.5
 parameters->epsilon: 0.01
 parameters->centerx: 0.5
 parameters->centery: 0.5
-parameters->mobility: 0.004
+parameters->mobility: 0.001
 parameters->a: 1.0
 parameters->b: 1.0
 parameters->innerdensity: 0
@@ -62,6 +62,6 @@ ch->output[2]->name:               c
 ch->output[2]->mode:               1
 ch->output[2]->animation:          1
 
-adapt->timestep:    0.05
+adapt->timestep:    0.01
 adapt->start time:  0.0
 adapt->end time:    3.5

@@ -308,10 +308,10 @@ if (true) {
     auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constant1*(2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*gradPhi, 5);
     prob.addMatrixOperator(opCoupC, _v, _mu);
     //Switched sign????
-    auto opCoupC1 = makeOperator(tag::testvec_trial {}, absGradPhi*(-constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC), 5);
-    auto opCoupC2 = makeOperator(tag::testvec_trial {}, absGradPhi*(constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC*NxN), 5);
-    prob.addMatrixOperator(opCoupC1, _v, _mu);
-    prob.addMatrixOperator(opCoupC2, _v, _mu);
+    auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC), 5);
+    auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC*NxN), 5);
+    prob.addVectorOperator(opCoupC1, _v);
+    prob.addVectorOperator(opCoupC2, _v);
 
 
     //Initial Value and Boundary
