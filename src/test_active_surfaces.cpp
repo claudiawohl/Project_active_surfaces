@@ -31,18 +31,16 @@ int main(int argc, char** argv)
 {
     Environment env(argc, argv);
 
-    auto Basegrid = MeshCreator<Grid>("chMesh").create();
-    AdaptiveGrid grid{*Basegrid};
+    auto baseGrid = MeshCreator<Grid>("chMesh").create();
+    AdaptiveGrid grid{*baseGrid};
 
-    //TODO Basis-Erzeugung in Klasse verschieben
     auto stokesBasis = composite(power<WORLDDIM>(lagrange<2>()), lagrange<1>());
     auto chBasis = power<2>(lagrange<2>());
     auto chnsBasis = composite(chBasis, stokesBasis);
 
-    CHNSProb probCHNS("chns", grid, chnsBasis);
-
-    //Lagrange-Basis fixed!
-    ConcProb concProb("conc", grid, probCHNS.phi());
+    CHNSProb probCHNS("chns", grid, chnsBasis);        //TODO: Basis-Erzeugung in Klasse verschieben
+    auto inputPhi = probCHNS.phi();                             //TODO: Fix Segmentation fault
+    ConcProb concProb("conc", grid, inputPhi); //Lagrange-Basis fixed!
 
     CouplingBaseProblem prob{"prob", probCHNS, concProb};
     prob.initialize(INIT_ALL);
@@ -50,8 +48,8 @@ int main(int argc, char** argv)
     AdaptInfo adaptInfo("adapt");
     prob.initBaseProblem(adaptInfo);
 
-    AdaptInstationary adaptInst("adapt", prob, adaptInfo, prob, adaptInfo);
-    adaptInst.adapt();
+    AdaptInstationary adaptBase("adapt", prob, adaptInfo, prob, adaptInfo);
+    adaptBase.adapt();
 
     return 0;
 }
