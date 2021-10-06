@@ -9,6 +9,7 @@
 
 #include "amdis/extensions/CouplingBaseProblem.hpp"
 
+#include <dune/grid/io/file/vtk/vtkwriter.hh>
 #include <dune/functions/functionspacebases/compositebasis.hh>
 #include <dune/grid/albertagrid.hh>
 
@@ -63,18 +64,23 @@ int main(int argc, char** argv)
         concProb.problem().addMatrixOperator(zot(absGradPhi* divergenceOf(v), 5));
         concProb.problem().addMatrixOperator(zot(-absGradPhi*normal_vec *gradientOf(v)*normal_vec, 5));
 
-        ///Hill-function terms
-        //TODO: Name constants properly
-        double constant1=1.;
-        double constant3 = 1.;
+        bool axisymmetric = false;//TODO:
+        if(axisymmetric){
+            //auto v_r = concProb.problem().solution(makeTreePath(Dune::Indices::_1, Dune::Indices::_0, 1));
+            //concProb.problem().addMatrixOperator(zot(v_r*X(0), 5));
+        }
 
-        auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constant1*(2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*gradPhi, 5);
+        ///Hill-function terms
+        double constPe = 1.;
+        double c0 = 1.;
+
+        auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constPe*(2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c)))*gradPhi, 5);
         probCHNS.problem().addMatrixOperator(opCoupC, probCHNS._v, probCHNS._mu);
         //Switched sign????
-        auto opCoupC1 = makeOperator(tag::testvec_trial {}, absGradPhi*(-constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC), 5);
-        auto opCoupC2 = makeOperator(tag::testvec_trial {}, absGradPhi*(constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC*NxN), 5);
-        probCHNS.problem().addMatrixOperator(opCoupC1, probCHNS._v, probCHNS._mu); //TODO: _mu ist hier nicht korrekt!
-        probCHNS.problem().addMatrixOperator(opCoupC2, probCHNS._v, probCHNS._mu); //TODO: _mu ist hier nicht korrekt!
+        auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
+        auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 5);
+        probCHNS.problem().addVectorOperator(opCoupC1, probCHNS._v);
+        probCHNS.problem().addVectorOperator(opCoupC2, probCHNS._v);
     }
 
     AdaptInfo adaptInfo("adapt");
@@ -83,21 +89,25 @@ int main(int argc, char** argv)
     concProb.initBaseProblem(adaptInfo);
     concProb.initTimeInterface();
 
+    if (adaptInfo.timestepNumber() == 0) {
+        adaptInfo.setTime(adaptInfo.startTime());
+
+        probCHNS.setTime(adaptInfo);
+        probCHNS.solveInitialProblem(adaptInfo); // maybe initialAdaptInfo
+        probCHNS.transferInitialSolution(adaptInfo);
+
+        concProb.setTime(adaptInfo);
+        concProb.solveInitialProblem(adaptInfo); // maybe initialAdaptInfo
+        concProb.transferInitialSolution(adaptInfo);
+    }
+
+    //ToDo. Write out phi()
+    // VtkWriter phiWriter{Grid::leafGridView(), Dune::VTK::nonconforming};
+
     while (!(adaptInfo.reachedEndTime())) {
         adaptInfo.setTimestepIteration(0);
         adaptInfo.incTimestepNumber();
         adaptInfo.setTime(adaptInfo.time() + adaptInfo.timestep());
-
-        if (adaptInfo.timestepNumber() == 0) {
-            adaptInfo.setTime(adaptInfo.startTime());
-            probCHNS.setTime(adaptInfo);
-            probCHNS.solveInitialProblem(adaptInfo); // maybe initialAdaptInfo
-            probCHNS.transferInitialSolution(adaptInfo);
-
-            concProb.setTime(adaptInfo);
-            concProb.solveInitialProblem(adaptInfo); // maybe initialAdaptInfo
-            concProb.transferInitialSolution(adaptInfo);
-        }
 
         std::cout << "time = " << adaptInfo.time() << ", end time = " << adaptInfo.endTime() << ", timestep = "
         << adaptInfo.timestep() << "\n";
