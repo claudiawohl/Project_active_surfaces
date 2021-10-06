@@ -293,23 +293,23 @@ if (true) {
      */
 
     //coupling term (in equation 3) surface tension
-    double constant1 = 100.;
-    double constant3 = 1.;
+    double constPe = 100.;
+    double c0 = 1.;
 
    /*  with projection operator: Which sign???
-    auto opCoupC1 = makeOperator(tag::testvec {}, constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c))), 5);
+    auto opCoupC1 = makeOperator(tag::testvec {}, constPe*(constant2 + 2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c))), 5);
     prob.addVectorOperator(opCoupC1, _v);
-    auto opCoupC2 = makeOperator(tag::testvec {}, (-1.)*constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*NxN, 5);
+    auto opCoupC2 = makeOperator(tag::testvec {}, (-1.)*constPe*(constant2 + 2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c)))*NxN, 5);
     prob.addVectorOperator(opCoupC2, _v);*/
 
 
     //Hill function term
-    //auto gradf = gradientOf(constant1*(constant2 + 2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c))));
-    auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constant1*(2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*gradPhi, 5);
+    //auto gradf = gradientOf(constPe*(constant2 + 2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c))));
+    auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constPe*(2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c)))*gradPhi, 5);
     prob.addMatrixOperator(opCoupC, _v, _mu);
     //Switched sign????
-    auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC), 5);
-    auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC*NxN), 5);
+    auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
+    auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 5);
     prob.addVectorOperator(opCoupC1, _v);
     prob.addVectorOperator(opCoupC2, _v);
 
