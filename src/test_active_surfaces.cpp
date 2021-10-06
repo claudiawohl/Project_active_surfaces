@@ -46,12 +46,36 @@ int main(int argc, char** argv)
     ConcProb concProb("conc", grid, probCHNS.phi());
     concProb.initialize(INIT_ALL);
 
-    //TODO: Add coupling terms
+    if (true){
+        ///Coupling terms
+        auto v = probCHNS.v();
 
+        auto c = concProb.solution();
+        auto gradC = gradientOf(c);
+        auto gradPhi = concProb.gradPhi();
+        auto absGradPhi = concProb.absGradPhi();
+        auto normal_vec = concProb.normal_vec();
+        auto NxN = concProb.NxN();
 
-    //TODO: Do INIT_ALL here and fix segmentation fault
-    //CouplingBaseProblem prob{"prob", probCHNS, concProb};
-    //prob.initialize(INIT_ALL);
+        // <v grad(c), psi>
+        concProb.problem().addMatrixOperator(fot(v, tag::grad_test {}));
+        // <c grad_(v), psi>
+        concProb.problem().addMatrixOperator(zot(absGradPhi* divergenceOf(v), 5));
+        concProb.problem().addMatrixOperator(zot(-absGradPhi*normal_vec *gradientOf(v)*normal_vec, 5));
+
+        ///Hill-function terms
+        //TODO: Name constants properly
+        double constant1=1.;
+        double constant3 = 1.;
+
+        auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constant1*(2*Math::sqr(c)/(Math::sqr(constant3)+ Math::sqr(c)))*gradPhi, 5);
+        probCHNS.problem().addMatrixOperator(opCoupC, probCHNS._v, probCHNS._mu);
+        //Switched sign????
+        auto opCoupC1 = makeOperator(tag::testvec_trial {}, absGradPhi*(-constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC), 5);
+        auto opCoupC2 = makeOperator(tag::testvec_trial {}, absGradPhi*(constant1*4*Math::sqr(constant3)*c/Math::sqr(Math::sqr(constant3)+ Math::sqr(c))*gradC*NxN), 5);
+        probCHNS.problem().addMatrixOperator(opCoupC1, probCHNS._v, probCHNS._mu); //TODO: _mu ist hier nicht korrekt!
+        probCHNS.problem().addMatrixOperator(opCoupC2, probCHNS._v, probCHNS._mu); //TODO: _mu ist hier nicht korrekt!
+    }
 
     AdaptInfo adaptInfo("adapt");
     probCHNS.initBaseProblem(adaptInfo);
