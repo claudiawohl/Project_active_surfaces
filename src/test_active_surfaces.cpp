@@ -47,6 +47,12 @@ int main(int argc, char** argv)
     ConcProb concProb("conc", grid, probCHNS.phi());
     concProb.initialize(INIT_ALL);
 
+    AdaptInfo adaptInfo("adapt");
+    probCHNS.initBaseProblem(adaptInfo);
+    probCHNS.initTimeInterface();
+    concProb.initBaseProblem(adaptInfo);
+    concProb.initTimeInterface();
+
     if (true){
         ///Coupling terms
         auto v = probCHNS.v();
@@ -55,14 +61,14 @@ int main(int argc, char** argv)
         auto gradC = gradientOf(c);
         auto gradPhi = concProb.gradPhi();
         auto absGradPhi = concProb.absGradPhi();
-        auto normal_vec = concProb.normal_vec();
-        auto NxN = concProb.NxN();
+      //  auto normal_vec = concProb.normal_vec();
+      //  auto NxN = concProb.NxN();
 
         // <v grad(c), psi>
-        concProb.problem().addMatrixOperator(fot(v, tag::grad_test {}));
+        concProb.problem().addMatrixOperator(fot(absGradPhi*v, tag::grad_trial {}, 15));
         // <c grad_(v), psi>
-        concProb.problem().addMatrixOperator(zot(absGradPhi* divergenceOf(v), 5));
-        concProb.problem().addMatrixOperator(zot(-absGradPhi*normal_vec *gradientOf(v)*normal_vec, 5));
+      //  concProb.problem().addMatrixOperator(zot(absGradPhi* divergenceOf(v), 5));
+      //  concProb.problem().addMatrixOperator(zot(-absGradPhi*normal_vec *gradientOf(v)*normal_vec, 5));
 
         bool axisymmetric = false;//TODO:
         if(axisymmetric){
@@ -78,16 +84,10 @@ int main(int argc, char** argv)
         probCHNS.problem().addMatrixOperator(opCoupC, probCHNS._v, probCHNS._mu);
         //Switched sign????
         auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
-        auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 5);
+      //  auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 5);
         probCHNS.problem().addVectorOperator(opCoupC1, probCHNS._v);
-        probCHNS.problem().addVectorOperator(opCoupC2, probCHNS._v);
+       //f probCHNS.problem().addVectorOperator(opCoupC2, probCHNS._v);
     }
-
-    AdaptInfo adaptInfo("adapt");
-    probCHNS.initBaseProblem(adaptInfo);
-    probCHNS.initTimeInterface();
-    concProb.initBaseProblem(adaptInfo);
-    concProb.initTimeInterface();
 
     if (adaptInfo.timestepNumber() == 0) {
         adaptInfo.setTime(adaptInfo.startTime());
@@ -100,9 +100,6 @@ int main(int argc, char** argv)
         concProb.solveInitialProblem(adaptInfo); // maybe initialAdaptInfo
         concProb.transferInitialSolution(adaptInfo);
     }
-
-    //ToDo. Write out phi()
-    // VtkWriter phiWriter{Grid::leafGridView(), Dune::VTK::nonconforming};
 
     while (!(adaptInfo.reachedEndTime())) {
         adaptInfo.setTimestepIteration(0);

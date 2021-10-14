@@ -217,7 +217,7 @@ struct CHNSProb: BaseProblem<Traits>
         void fillBoundaryConditions(AdaptInfo& adaptInfo) override {
             this->problem().addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
             this->problem().addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
-            this->problem().addDirichletBC([](auto const& x) {return (x[1]<1.e-8 );}, makeTreePath(_1,_1), makeTreePath(_1,_1), 0.);
+            this->problem().addDirichletBC([](auto const& x) {return (x[1]<1.e-8 );}, _p, _p, 0.);
         }
 
         void initData(AdaptInfo& adaptInfo) override{
