@@ -48,10 +48,6 @@ int main(int argc, char** argv)
     concProb.initialize(INIT_ALL);
 
     AdaptInfo adaptInfo("adapt");
-    probCHNS.initBaseProblem(adaptInfo);
-    probCHNS.initTimeInterface();
-    concProb.initBaseProblem(adaptInfo);
-    concProb.initTimeInterface();
 
     if (true){
         ///Coupling terms
@@ -61,19 +57,19 @@ int main(int argc, char** argv)
         auto gradC = gradientOf(c);
         auto gradPhi = concProb.gradPhi();
         auto absGradPhi = concProb.absGradPhi();
-      //  auto normal_vec = concProb.normal_vec();
-      //  auto NxN = concProb.NxN();
+        auto normal_vec = concProb.normal_vec();
+        auto NxN = concProb.NxN();
 
         // <v grad(c), psi>
         concProb.problem().addMatrixOperator(fot(absGradPhi*v, tag::grad_trial {}, 15));
         // <c grad_(v), psi>
-      //  concProb.problem().addMatrixOperator(zot(absGradPhi* divergenceOf(v), 5));
-      //  concProb.problem().addMatrixOperator(zot(-absGradPhi*normal_vec *gradientOf(v)*normal_vec, 5));
+        concProb.problem().addMatrixOperator(zot(absGradPhi* divergenceOf(v), 5));
+        concProb.problem().addMatrixOperator(zot(-absGradPhi*normal_vec *gradientOf(v)*normal_vec, 5));
 
-        bool axisymmetric = false;//TODO:
+        bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
         if(axisymmetric){
-            //auto v_r = concProb.problem().solution(makeTreePath(Dune::Indices::_1, Dune::Indices::_0, 1));
-            //concProb.problem().addMatrixOperator(zot(v_r*X(0), 5));
+            auto v_r = probCHNS.problem().solution(makeTreePath(Dune::Indices::_1, Dune::Indices::_0, 1));
+            concProb.problem().addMatrixOperator(zot(v_r*X(0), 5));
         }
 
         ///Hill-function terms
@@ -84,10 +80,15 @@ int main(int argc, char** argv)
         probCHNS.problem().addMatrixOperator(opCoupC, probCHNS._v, probCHNS._mu);
         //Switched sign????
         auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
-      //  auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 5);
+        auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*dot(gradC, normal_vec)*normal_vec), 5);
         probCHNS.problem().addVectorOperator(opCoupC1, probCHNS._v);
-       //f probCHNS.problem().addVectorOperator(opCoupC2, probCHNS._v);
+        probCHNS.problem().addVectorOperator(opCoupC2, probCHNS._v);
     }
+    probCHNS.initBaseProblem(adaptInfo);
+    concProb.initBaseProblem(adaptInfo);
+
+    probCHNS.initTimeInterface();
+    concProb.initTimeInterface();
 
     if (adaptInfo.timestepNumber() == 0) {
         adaptInfo.setTime(adaptInfo.startTime());

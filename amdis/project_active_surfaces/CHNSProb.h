@@ -32,6 +32,8 @@ struct CHNSProb: BaseProblem<Traits>
         const double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.;
         const double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
 
+        double invtau = 1./Parameters::get<double>("adapt->timestep").value_or(1);
+
         //double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
         //double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
         //double centery = Parameters::get<double>("parameters->centery").value_or(0.);
@@ -60,7 +62,7 @@ struct CHNSProb: BaseProblem<Traits>
              We implement them in their weak formultation.
             **/
         void fillCahnHilliard(AdaptInfo& adaptInfo) {
-            auto invTau = std::ref(this->invTau());
+            //auto invTau = std::ref(this->invTau());
             
             /// FIRST EQUATION
             /**\f(
@@ -69,8 +71,8 @@ struct CHNSProb: BaseProblem<Traits>
 
 
             ///time derivative
-            this->problem().addMatrixOperator(zot(invTau), _phi, _phi);
-            this->problem().addVectorOperator(zot(phi() * invTau), _phi);
+            this->problem().addMatrixOperator(zot(invtau), _phi, _phi);
+            this->problem().addVectorOperator(zot(phi() * invtau), _phi);
 
             ///convection term (coupling)
             auto opFconv = makeOperator(tag::test_trialvec{}, gradientOf(phi()), 5);
@@ -127,7 +129,7 @@ struct CHNSProb: BaseProblem<Traits>
         * We implement them in their weak formulation.
         */
         void fillNavierStokes(AdaptInfo& adaptInfo) {
-            auto invTau = std::ref(this->invTau());
+            //auto invTau = std::ref(this->invTau());
 
             ///THIRD EQUATION
             /**
@@ -164,7 +166,8 @@ struct CHNSProb: BaseProblem<Traits>
                 this->problem().addMatrixOperator(opExtra, makeTreePath(_1, _1), makeTreePath(_1, _0, 0));
             };
 
-            if (true) {
+            bool enable_navier =  Parameters::get<bool>("parameters->navier").value_or(true);
+            if (enable_navier) {
                 // define a constant fluid density
                 double density_inner = Parameters::get<double>("parameters->innerdensity").value_or(100.);
                 double density_outer = Parameters::get<double>("parameters->outerdensity").value_or(1000.);
@@ -173,12 +176,12 @@ struct CHNSProb: BaseProblem<Traits>
                 ///time derivative
                 // <1/tau * u, v>
                 auto opTime = makeOperator(tag::testvec_trialvec{},
-                                           density * invTau, 5);
+                                           density * invtau, 5);
                 this->problem().addMatrixOperator(opTime, _v, _v);
 
                 // <1/tau * u^old, v>
                 auto opTimeOld = makeOperator(tag::testvec{},
-                                              density * invTau * v(), 5);
+                                              density * invtau * v(), 5);
                 this->problem().addVectorOperator(opTimeOld, _v);
 
                 ///material derivative part
@@ -245,6 +248,8 @@ struct CHNSProb: BaseProblem<Traits>
             double radius = Parameters::get<double>("parameters->radius").value_or(0.5);
             double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
             double centery = Parameters::get<double>("parameters->centery").value_or(0.);
+
+            if (axisymmetric){centerx = 0.;}
 
             //set initial value for Benchmark
             for (int i = 0; i < 10; ++i) {
