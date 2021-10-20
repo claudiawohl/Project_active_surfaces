@@ -267,12 +267,15 @@ if (true) {
     //Laplace term
     auto opConcLaplacian1 = makeOperator(tag::gradtest_gradtrial {}, absGradPhi * Id,5);
     prob.addMatrixOperator(opConcLaplacian1, _c, _c);
-    auto opConcLaplacian2 = makeOperator(tag::gradtest_gradtrial {}, - absGradPhi * NxN,5);
-    prob.addMatrixOperator(opConcLaplacian2, _c, _c);
+    //auto opConcLaplacian2 = makeOperator(tag::gradtest_gradtrial {}, - absGradPhi * NxN,5);
+    //prob.addMatrixOperator(opConcLaplacian2, _c, _c);
 
     if(axisymmetric){
-        auto PGradC_r = (FieldVector<double, 2>{1.,0.}-FieldVector<double, 2>{1.,0.}*NxN)*gradC;
-        prob.addMatrixOperator(zot(PGradC_r*axisymmFunction(1.), 5),_c, _c);
+        auto PGradC_r = absGradPhi/X(0)*FieldVector<double, 2>{1.,0.}*gradC;
+        //auto PGradC_r = absGradPhi*(FieldVector<double, 2>{1.,0.}-FieldVector<double, 2>{1.,0.}*NxN)*gradC;
+        //prob.addVectorOperator(zot(PGradC_r, 5),_c); //TODO: Find Error here
+        auto GradC_r = makeOperator(tag::test_gradtrial{}, -absGradPhi/X(0)*FieldVector<double, 2>{1.,0.},5);
+        prob.addMatrixOperator(GradC_r, _c, _c);
     }
 
     //Convection term with Projection operator
@@ -281,7 +284,7 @@ if (true) {
 
     if(axisymmetric){
         auto v_r = prob.solution(makeTreePath(_1, _0, 1));
-        prob.addMatrixOperator(zot(v_r*axisymmFunction(1.), 5),_c, _c);
+        prob.addMatrixOperator(zot(absGradPhi*v_r/X(0), 5),_c, _c);
     }
 
     /*
@@ -304,12 +307,13 @@ if (true) {
 
 
     //Hill function term
+    //TODO: Check signs
     //auto gradf = gradientOf(constPe*(constant2 + 2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c))));
     auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constPe*(2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c)))*gradPhi, 5);
     prob.addMatrixOperator(opCoupC, _v, _mu);
     //Switched sign????
-    auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
-    auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 5);
+    auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
+    auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 5);
     prob.addVectorOperator(opCoupC1, _v);
     prob.addVectorOperator(opCoupC2, _v);
 
@@ -344,6 +348,8 @@ if (true) {
     double centerx = Parameters::get<double>("parameters->centerx").value_or(0.);
     double centery = Parameters::get<double>("parameters->centery").value_or(0.);
 
+    if (axisymmetric){centerx = 0.;}
+
     for (int i = 0; i < 10; ++i) {
         phi << [eps, radius, centerx, centery](auto const& x) {
             using Math::sqr;
@@ -353,14 +359,17 @@ if (true) {
         prob.adaptGrid(adaptInfo);
     }
 
-    c << [](auto const& x){
-        if (x[0]<0.5){return 0.5;};
+    int i = 0;
+    if (axisymmetric) {i=1;}
+    c << [i](auto const& x){
+        if (x[i]<0.5){return 0.5;};
         return 1.0;
     };
 
     //boundary condition
     prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
     prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
+    prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8); }, _p, _p, 0.);
 
     AdaptInstationary adapt("adapt", prob, adaptInfo, probInstat, adaptInfo);
     adapt.adapt();
