@@ -62,14 +62,14 @@ template <class Grid, class Phase>
                     //this->problem().addMatrixOperator(opConcLaplacian2, _c, _c);
 
                     if(axisymmetric){
-                        auto PGradC_r = absGradPhi()*Dune::FieldVector<double, 2>{1., 0.}*gradC;
+                        //auto PGradC_r = absGradPhi()*Dune::FieldVector<double, 2>{1., 0.}*gradC;
                         //auto PGradC_r = (FieldVector<double, 2>{1.,0.}-FieldVector<double, 2>{1.,0.}*NxN())*gradC;
-                        this->problem().addVectorOperator(zot(PGradC_r/X(0), 5));
+                        //this->problem().addVectorOperator(zot(PGradC_r/X(0), 5));
 
-                        if(false){
-                            auto PGradC_r = makeOperator(tag::test_gradtrial {}, absGradPhi()*(FieldVector<double, 2>{1.,0.}-FieldVector<double, 2>{1.,0.}*NxN()), 5);
-                            this->problem().addMatrixOperator(PGradC_r);
-                        }
+                        auto PGradC_r = makeOperator(tag::test_gradtrial {}, -absGradPhi()*FieldVector<double, 2>{1.,0.}, 5);
+                        //auto PGradC_r = makeOperator(tag::test_gradtrial {}, absGradPhi()*(FieldVector<double, 2>{1.,0.}-FieldVector<double, 2>{1.,0.}*NxN()), 5);
+                        this->problem().addMatrixOperator(PGradC_r);
+
                     }
 
                 }
@@ -84,7 +84,7 @@ template <class Grid, class Phase>
                     if (axisymmetric){i = 1;}
 
                     c << [i](auto const& x){
-                        if (x[i]<0.5){return 0.5;};
+                        if (x[i]<0.5){return 1.5;};
                         return 1.0;
                     };
                     return;

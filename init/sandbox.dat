@@ -12,10 +12,10 @@ parameters->radius2: 0.5
 parameters->epsilon: 0.01
 parameters->centerx: 0.5
 parameters->centery: 0.5
-parameters->mobility: 0.000001
+parameters->mobility: 0.0001
 parameters->a: 1.0
 parameters->b: 1.0
-parameters->sigma: 24.5
+parameters->sigma: 1.0
 
 parameters->extra: 0.0001
 

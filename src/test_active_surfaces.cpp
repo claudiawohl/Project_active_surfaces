@@ -69,18 +69,18 @@ int main(int argc, char** argv)
         bool axisymmetric = Parameters::get<bool>("parameters->axisymmetric").value_or(false);
         if(axisymmetric){
             auto v_r = probCHNS.problem().solution(makeTreePath(Dune::Indices::_1, Dune::Indices::_0, 1));
-            concProb.problem().addMatrixOperator(zot(v_r*X(0), 5));
+            concProb.problem().addMatrixOperator(zot(absGradPhi*v_r*X(0), 5));
         }
 
         ///Hill-function terms
-        double constPe = 1.;
+        double constPe = 1000.;
         double c0 = 1.;
 
         auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constPe*(2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c)))*gradPhi, 5);
         probCHNS.problem().addMatrixOperator(opCoupC, probCHNS._v, probCHNS._mu);
         //Switched sign????
-        auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
-        auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*dot(gradC, normal_vec)*normal_vec), 5);
+        auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
+        auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*dot(gradC, normal_vec)*normal_vec), 5);
         probCHNS.problem().addVectorOperator(opCoupC1, probCHNS._v);
         probCHNS.problem().addVectorOperator(opCoupC2, probCHNS._v);
     }
