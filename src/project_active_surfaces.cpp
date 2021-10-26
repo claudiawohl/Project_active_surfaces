@@ -75,6 +75,7 @@ int main(int argc, char** argv)
     auto invTau = std::ref(probInstat.invTau());
     auto phi = prob.solution(_0,0);
     auto gradPhi = gradientOf(phi);
+    auto mu = prob.solution(_0,1);
     auto v = prob.solution(_1,_0);
     auto c = prob.solution(_2);
     auto phiProjected = max(min(evalAtQP(phi),Dune::FieldVector<double,1>{1.}), Dune::FieldVector<double, 1>{0.});
@@ -133,7 +134,9 @@ int main(int argc, char** argv)
      * (\mu^m, \varphi_2)-\sigma \varepsilon(\nabla \phi^m,\nabla \varphi_2)- \varepsilon^{-1}(W'(\phi^m),\varphi_2) &=0
      * \f)
      */
-    double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*sqrt(2.)*3.;
+    double peclet = Parameters::get<double>("parameters->peclet").value_or(100.);
+    double kappa = sqrt(2.)*3.;//
+    double sigma = Parameters::get<double>("parameters->sigma").value_or(24.5)*peclet*kappa;
     double eps = Parameters::get<double>("parameters->epsilon").value_or(0.02);
 
     ///mu
@@ -257,8 +260,8 @@ if (true) {
     auto gradC = gradientOf(c);
 
     //time derivative
-    prob.addMatrixOperator(zot(invTau*absGradPhi, 5), _c, _c);
-    prob.addVectorOperator(zot(absGradPhi*invTau*c, 5), _c);
+    prob.addMatrixOperator(zot(invTau, 5), _c, _c);//*absGradPhi
+    prob.addVectorOperator(zot(invTau*c, 5), _c);//*absGradPhi
 
     //nonlinearity (time derivative)
     auto opConcVelTime = makeOperator(tag::test_gradtrial{}, v*absGradPhi,5);
@@ -273,14 +276,14 @@ if (true) {
     if(axisymmetric){
         auto PGradC_r = absGradPhi/X(0)*FieldVector<double, 2>{1.,0.}*gradC;
         //auto PGradC_r = absGradPhi*(FieldVector<double, 2>{1.,0.}-FieldVector<double, 2>{1.,0.}*NxN)*gradC;
-        //prob.addVectorOperator(zot(PGradC_r, 5),_c); //TODO: Find Error here
+        prob.addVectorOperator(zot(PGradC_r, 5),_c); //TODO: Find Error here
         auto GradC_r = makeOperator(tag::test_gradtrial{}, -absGradPhi/X(0)*FieldVector<double, 2>{1.,0.},5);
         prob.addMatrixOperator(GradC_r, _c, _c);
     }
 
     //Convection term with Projection operator
     prob.addMatrixOperator(zot(absGradPhi* divergenceOf(v), 5), _c, _c);
-    prob.addMatrixOperator(zot(-absGradPhi*normal_vec *gradientOf(v)*normal_vec, 5), _c, _c);
+    prob.addMatrixOperator(zot(-1/absGradPhi*gradPhi *gradientOf(v)*gradPhi, 5), _c, _c);
 
     if(axisymmetric){
         auto v_r = prob.solution(makeTreePath(_1, _0, 1));
@@ -296,7 +299,6 @@ if (true) {
      */
 
     //coupling term (in equation 3) surface tension
-    double constPe = 100.;
     double c0 = 1.;
 
    /*  with projection operator: Which sign???
@@ -308,12 +310,21 @@ if (true) {
 
     //Hill function term
     //TODO: Check signs
-    //auto gradf = gradientOf(constPe*(constant2 + 2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c))));
-    auto opCoupC = makeOperator(tag::testvec_trial {}, (-1.)*sqrt(2.)*3.*constPe*(2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c)))*gradPhi, 5);
-    prob.addMatrixOperator(opCoupC, _v, _mu);
-    //Switched sign????
-    auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 5);
-    auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(-constPe*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 5);
+
+    //auto opCoupC = makeOperator(tag::testvec_trial {}, peclet*kappa*(2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c)))*gradPhi, 15);
+    //prob.addMatrixOperator(opCoupC, _v, _mu);
+
+    auto opCoupC = makeOperator(tag::testvec {}, (-1.)*peclet*kappa*(2*pow<2>(c)/(Math::sqr(c0)+ pow<2>(c)))*gradPhi*mu, 15);
+    prob.addVectorOperator(opCoupC, _v);
+
+    //TODO: Write out Hill function
+  //  Dune::VtkWriter hillWriter(grid->leafGridView());
+  //  auto vector = peclet*kappa*(2*Math::sqr(c)/(Math::sqr(c0)+ Math::sqr(c)))*gradPhi;
+  //  hillWriter.addCellData(vector, "hill-c", 2);                         // vector contains  value per cell
+  //  hillWriter.write("hill-c", "output");
+
+    auto opCoupC1 = makeOperator(tag::testvec {}, absGradPhi*(-peclet*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC), 15);
+    auto opCoupC2 = makeOperator(tag::testvec {}, absGradPhi*(peclet*4*Math::sqr(c0)*c/Math::sqr(Math::sqr(c0)+ Math::sqr(c))*gradC*NxN), 15);
     prob.addVectorOperator(opCoupC1, _v);
     prob.addVectorOperator(opCoupC2, _v);
 
@@ -358,16 +369,21 @@ if (true) {
         prob.markElements(adaptInfo);
         prob.adaptGrid(adaptInfo);
     }
-
-    int i = 0;
-    if (axisymmetric) {i=1;}
-    c << [i](auto const& x){
-        if (x[i]<0.5){return 0.5;};
+/*
+    c << [](auto const& x){
+        if (x[1]<0.5){return 1.5;};
         return 1.0;
     };
+*/
+    if(axisymmetric){
+        c << [](auto const& x) {return atan2(x[1],x[0]-0.5)*3.1459265358979323846;};
+    }
+    else {
+        c<< [](auto const& x) {return 2-2*x[1];};
+    }
 
     //boundary condition
-    prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
+    //prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8 || x[1]>2-1.e-8);}, _v, _v, FieldVector<double, WORLDDIM>{0., 0.});
     prob.addDirichletBC([](auto const& x) {return (x[0]<1.e-8 || x[0]>1-1.e-8);}, makeTreePath(_1,_0,0), makeTreePath(_1,_0,0), 0.);
     prob.addDirichletBC([](auto const& x) {return (x[1]<1.e-8); }, _p, _p, 0.);
 

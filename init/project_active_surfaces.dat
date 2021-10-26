@@ -11,14 +11,15 @@ parameters->radius2: 0.5
 parameters->epsilon: 0.01
 parameters->centerx: 0.5
 parameters->centery: 0.5
-parameters->mobility: 0.000001
+parameters->mobility: 0.00001
 parameters->a: 1.0
 parameters->b: 1.0
-parameters->innerdensity: 0
-parameters->outerdensity: 0
+parameters->innerdensity: 0.
+parameters->outerdensity: 0.
 parameters->innervelocity: 1.
 parameters->outervelocity: 10.
-parameters->sigma: 24.5
+parameters->sigma: 1.
+parameters->peclet: 100.
 
 refinement->interface: 10
 refinement->bulk: 2
